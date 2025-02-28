@@ -1,4 +1,3 @@
-// app/auth/callback/route.ts
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
@@ -13,6 +12,6 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code)
   }
 
-  // Redirect to the dashboard instead of the origin
-  return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
+  // Redirect to the dashboard 
+  return NextResponse.redirect(new URL('/dashboard', requestUrl.origin))
 }
