@@ -57,17 +57,17 @@ export function Sidebar() {
       {/* Sidebar */}
       <div 
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r transform transition-transform duration-300 ease-in-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-900 border-r dark:border-gray-700 transform transition-transform duration-300 ease-in-out lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex h-full flex-col">
           {/* Sidebar header */}
-          <div className="flex h-16 items-center justify-between border-b px-4">
-            <h1 className="text-xl font-semibold">Tea Inventory</h1>
+          <div className="flex h-16 items-center justify-between border-b dark:border-gray-700 px-4">
+            <h1 className="text-xl font-semibold dark:text-white">Tea Inventory</h1>
             <button 
               onClick={toggle}
-              className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden"
+              className="rounded-md p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300 hover:text-gray-700 lg:hidden"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -84,8 +84,8 @@ export function Sidebar() {
                   className={cn(
                     'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium',
                     isActive
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                   )}
                 >
                   <item.icon className="h-5 w-5 shrink-0" />
@@ -98,10 +98,10 @@ export function Sidebar() {
           </nav>
 
           {/* Sign out button */}
-          <div className="border-t p-3">
+          <div className="border-t dark:border-gray-700 p-3">
             <button
               onClick={handleSignOut}
-              className="flex w-full items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              className="flex w-full items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
             >
               <LogOut className="h-5 w-5 shrink-0" />
               <span className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
@@ -116,11 +116,11 @@ export function Sidebar() {
       <button
         onClick={toggle}
         className={cn(
-          "fixed left-4 top-4 z-50 rounded-md bg-white p-2 shadow-md lg:hidden",
+          "fixed left-4 top-4 z-50 rounded-md bg-white dark:bg-gray-900 p-2 shadow-md lg:hidden",
           isOpen && "hidden"
         )}
       >
-        <Menu className="h-6 w-6 text-gray-700" />
+        <Menu className="h-6 w-6 text-gray-700 dark:text-gray-300" />
       </button>
     </>
   )
