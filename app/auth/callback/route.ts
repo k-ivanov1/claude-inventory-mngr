@@ -9,9 +9,22 @@ export async function GET(request: Request) {
   if (code) {
     const cookieStore = cookies()
     const supabase = createClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    
+    // Log any potential errors during session exchange
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (error) {
+      console.error('Error exchanging code for session:', error)
+      // Optionally redirect to login page with an error
+      return NextResponse.redirect(new URL('/login?error=auth_failed', requestUrl.origin))
+    }
   }
 
-  // Redirect to the dashboard 
-  return NextResponse.redirect(new URL('/dashboard', requestUrl.origin))
+  // Ensure absolute URL is used for redirect
+  const dashboardUrl = new URL('/dashboard', process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin)
+  
+  return NextResponse.redirect(dashboardUrl)
 }
+
+// Ensure this route can handle the authentication callback
+export const dynamic = 'force-dynamic'
