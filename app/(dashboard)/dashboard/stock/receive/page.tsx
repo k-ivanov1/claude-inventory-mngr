@@ -112,6 +112,13 @@ export default function ReceiveStockPage() {
   }
 
   return (
+     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold">Stock Receiving</h2>
+          <p className="text-gray-600">Manage incoming stock and inventory</p>
+        </div>
+      </div>
+    
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
