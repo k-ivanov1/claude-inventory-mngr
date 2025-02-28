@@ -10,7 +10,9 @@ import {
   Users,
   LogOut,
   PackageOpen,
-  Clipboard
+  Clipboard,
+  Coffee,
+  Tag
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -20,6 +22,7 @@ import { useRouter } from 'next/navigation'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Sales', href: '/dashboard/sales', icon: ShoppingCart },
+  { name: 'Products', href: '/dashboard/products', icon: Coffee },
   { name: 'Inventory', href: '/dashboard/inventory', icon: Package },
   { name: 'Stock Receiving', href: '/dashboard/stock/receive', icon: PackageOpen },
   { name: 'Product Recipes', href: '/dashboard/recipes', icon: Clipboard },
