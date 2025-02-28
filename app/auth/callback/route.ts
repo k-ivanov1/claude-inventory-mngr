@@ -15,22 +15,10 @@ export async function GET(request: Request) {
       console.error('Authentication error:', error)
       return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, requestUrl.origin))
     }
-
-    // Set cookies manually if needed
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session) {
-      const cookieStore = cookies()
-      cookieStore.set('sb:token', session.access_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: session.expires_in,
-        path: '/'
-      })
-    }
   }
 
   // Redirect to dashboard
-  return NextResponse.redirect(new URL('/dashboard', process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin))
+  return NextResponse.redirect(new URL('/dashboard', requestUrl.origin))
 }
 
 // Ensure dynamic routing
