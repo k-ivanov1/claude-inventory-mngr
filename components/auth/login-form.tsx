@@ -1,6 +1,8 @@
 'use client'
-import { useState } from 'react'
+
+import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useSearchParams } from 'next/navigation'
 
 export function LoginForm() {
   const [email, setEmail] = useState('')
@@ -8,6 +10,15 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const supabase = createClientComponentClient()
+  const searchParams = useSearchParams()
+
+  // Check for error from the callback route
+  useEffect(() => {
+    const errorMessage = searchParams.get('error')
+    if (errorMessage) {
+      setError(errorMessage)
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -23,23 +34,18 @@ export function LoginForm() {
     try {
       // Get the site URL dynamically to handle both local dev and production
       const siteURL = window.location.origin
-      console.log('Redirect URL:', `${siteURL}/auth/callback`)
       
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${siteURL}/auth/callback`
+          emailRedirectTo: `${siteURL}/auth/callback`,
         },
       })
 
-      if (error) {
-        console.error('Supabase SignIn Error:', error)
-        throw error
-      }
+      if (error) throw error
 
       setSuccess(true)
     } catch (err: any) {
-      console.error('Login Error:', err)
       setError(err.message)
     } finally {
       setLoading(false)
