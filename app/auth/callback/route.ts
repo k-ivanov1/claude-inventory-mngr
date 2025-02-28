@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createCallbackClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
@@ -7,24 +7,31 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get('code')
 
   if (code) {
-    const cookieStore = cookies()
-    const supabase = createClient()
+    const supabase = createCallbackClient()
     
-    // Log any potential errors during session exchange
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (error) {
-      console.error('Error exchanging code for session:', error)
-      // Optionally redirect to login page with an error
-      return NextResponse.redirect(new URL('/login?error=auth_failed', requestUrl.origin))
+      console.error('Authentication error:', error)
+      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, requestUrl.origin))
+    }
+
+    // Set cookies manually if needed
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      const cookieStore = cookies()
+      cookieStore.set('sb:token', session.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: session.expires_in,
+        path: '/'
+      })
     }
   }
 
-  // Ensure absolute URL is used for redirect
-  const dashboardUrl = new URL('/dashboard', process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin)
-  
-  return NextResponse.redirect(dashboardUrl)
+  // Redirect to dashboard
+  return NextResponse.redirect(new URL('/dashboard', process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin))
 }
 
-// Ensure this route can handle the authentication callback
+// Ensure dynamic routing
 export const dynamic = 'force-dynamic'
