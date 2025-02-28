@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { ReceiveTeaCoffeeForm } from '@/components/inventory/receive-tea-coffee-form'
 import { ReceiveOtherStockForm } from '@/components/inventory/receive-other-stock-form'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TeaCoffeeStock, OtherStock } from '@/lib/types/stock'
 
 export default function ReceiveStockPage() {
