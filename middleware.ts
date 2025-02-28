@@ -7,6 +7,13 @@ export async function middleware(request: NextRequest) {
   const supabase = createMiddlewareClient({ req: request, res })
   const { data: { session } } = await supabase.auth.getSession()
 
+  // If user accesses the root path, redirect to dashboard or login
+  if (request.nextUrl.pathname === '/') {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = session ? '/dashboard' : '/login'
+    return NextResponse.redirect(redirectUrl)
+  }
+
   // If there's no session and the user is trying to access a protected route
   if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
     const redirectUrl = request.nextUrl.clone()
@@ -25,5 +32,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login']
+  matcher: ['/', '/dashboard/:path*', '/login']
 }
