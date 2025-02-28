@@ -1,5 +1,4 @@
 'use client'
-
 import { useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
@@ -24,18 +23,27 @@ export function LoginForm() {
     try {
       // Get the site URL dynamically to handle both local dev and production
       const siteURL = window.location.origin
+      console.log('Redirect URL:', `${siteURL}/auth/callback`)
       
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: `${siteURL}/auth/callback`,
+          // Optional: Add debugging scopes if needed
+          debug: {
+            console: true
+          }
         },
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase SignIn Error:', error)
+        throw error
+      }
 
       setSuccess(true)
     } catch (err: any) {
+      console.error('Login Error:', err)
       setError(err.message)
     } finally {
       setLoading(false)
