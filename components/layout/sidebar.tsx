@@ -8,7 +8,9 @@ import {
   FileBarChart,
   Settings,
   Users,
-  LogOut
+  LogOut,
+  PackageOpen,
+  Clipboard
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -19,6 +21,8 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Sales', href: '/dashboard/sales', icon: ShoppingCart },
   { name: 'Inventory', href: '/dashboard/inventory', icon: Package },
+  { name: 'Stock Receiving', href: '/dashboard/stock/receive', icon: PackageOpen },
+  { name: 'Product Recipes', href: '/dashboard/recipes', icon: Clipboard },
   { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
   { name: 'Team', href: '/dashboard/team', icon: Users },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
@@ -45,7 +49,7 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4">
           {navigation.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
             return (
               <Link
                 key={item.name}
