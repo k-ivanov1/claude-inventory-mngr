@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { X, Plus, Minus } from 'lucide-react'
 
 interface SaleItem {
@@ -15,7 +15,7 @@ export function NewSaleForm({ onClose }: { onClose: () => void }) {
   const [customerName, setCustomerName] = useState('')
   const [loading, setLoading] = useState(false)
   const [products, setProducts] = useState<any[]>([])
-  const supabase = createClient()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -133,7 +133,7 @@ export function NewSaleForm({ onClose }: { onClose: () => void }) {
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
               required
             />
           </div>
@@ -158,7 +158,7 @@ export function NewSaleForm({ onClose }: { onClose: () => void }) {
                     <select
                       value={item.product_id}
                       onChange={(e) => updateItem(index, 'product_id', e.target.value)}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                       required
                     >
                       <option value="">Select a product</option>
@@ -184,7 +184,7 @@ export function NewSaleForm({ onClose }: { onClose: () => void }) {
                         min="1"
                         value={item.quantity}
                         onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value))}
-                        className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        className="block w-20 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                         required
                       />
                       <button
