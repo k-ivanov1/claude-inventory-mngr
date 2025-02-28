@@ -22,10 +22,13 @@ export function LoginForm() {
     }
 
     try {
+      // Get the site URL dynamically to handle both local dev and production
+      const siteURL = window.location.origin
+      
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${siteURL}/auth/callback`,
         },
       })
 
