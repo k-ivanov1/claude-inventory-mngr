@@ -26,8 +26,8 @@ export default async function DashboardPage() {
       <DashboardCards />
       
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <RecentSales data={salesData} />
-        <InventoryLevels data={inventoryData} />
+        <RecentSales data={salesData || []} />
+        <InventoryLevels data={inventoryData || []} />
       </div>
     </div>
   )
