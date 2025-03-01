@@ -188,147 +188,114 @@ const calculateTotalCost = () => {
   }, 0)
 }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError(null);
 
-    try {
-      // Validate required fields
-      if (!formData.name || !formData.final_product_id) {
-        throw new Error('Recipe name and final product are required fields.')
+  try {
+    // Validate required fields
+    if (!formData.name || !formData.final_product_id) {
+      throw new Error('Recipe name and final product are required fields.');
+    }
+
+    if (formData.items.length === 0) {
+      throw new Error('Recipe must have at least one ingredient.');
+    }
+
+    // Validate each item has a material and quantity
+    const invalidItem = formData.items.find(item => !item.raw_material_id || item.quantity <= 0);
+    if (invalidItem) {
+      throw new Error('All ingredients must have a raw material and a positive quantity.');
+    }
+
+    if (recipe?.id) {
+      // Update existing recipe
+      // Since we can't use transactions directly, we'll perform operations sequentially
+      
+      // 1. Update recipe
+      const { error: recipeError } = await supabase
+        .from('product_recipes')
+        .update({
+          name: formData.name,
+          description: formData.description || null,
+          final_product_id: formData.final_product_id,
+          yield_quantity: formData.yield_quantity,
+          is_active: formData.is_active
+        })
+        .eq('id', recipe.id);
+      
+      if (recipeError) throw recipeError;
+      
+      // 2. Delete existing recipe items
+      const { error: deleteError } = await supabase
+        .from('recipe_items')
+        .delete()
+        .eq('recipe_id', recipe.id);
+      
+      if (deleteError) throw deleteError;
+      
+      // 3. Insert new recipe items
+      const recipeItems = formData.items.map(item => ({
+        recipe_id: recipe.id,
+        raw_material_id: item.raw_material_id,
+        quantity: item.quantity
+      }));
+      
+      const { error: itemsError } = await supabase
+        .from('recipe_items')
+        .insert(recipeItems);
+      
+      if (itemsError) throw itemsError;
+    } else {
+      // Insert new recipe
+      const { data: recipeData, error: recipeError } = await supabase
+        .from('product_recipes')
+        .insert({
+          name: formData.name,
+          description: formData.description || null,
+          final_product_id: formData.final_product_id,
+          yield_quantity: formData.yield_quantity,
+          is_active: formData.is_active
+        })
+        .select();
+      
+      if (recipeError) throw recipeError;
+      
+      // Insert recipe items
+      if (recipeData && recipeData.length > 0) {
+        const recipeId = recipeData[0].id;
+        
+        const recipeItems = formData.items.map(item => ({
+          recipe_id: recipeId,
+          raw_material_id: item.raw_material_id,
+          quantity: item.quantity
+        }));
+        
+        const { error: itemsError } = await supabase
+          .from('recipe_items')
+          .insert(recipeItems);
+        
+        if (itemsError) throw itemsError;
       }
+    }
 
-      if (formData.items.length === 0) {
-        throw new Error('Recipe must have at least one ingredient.')
-      }
+    // Also update the final product to mark it as recipe-based
+    const { error: updateProductError } = await supabase
+      .from('final_products')
+      .update({ is_recipe_based: true })
+      .eq('id', formData.final_product_id);
+    
+    if (updateProductError) throw updateProductError;
 
-      // Validate each item has a material and quantity
-      const invalidItem = formData.items.find(item => !item.raw_material_id || item.quantity <= 0)
-      if (invalidItem) {
-        throw new Error('All ingredients must have a raw material and a positive quantity.')
-      }
-
-      // Start a transaction
-// Start a transaction
-if (recipe?.id) {
-  // Update existing recipe
-  // Since we can't use transactions directly, we'll perform operations sequentially
-  
-  // 1. Update recipe
-  const { error: recipeError } = await supabase
-    .from('product_recipes')
-    .update({
-      name: formData.name,
-      description: formData.description || null,
-      final_product_id: formData.final_product_id,
-      yield_quantity: formData.yield_quantity,
-      is_active: formData.is_active
-    })
-    .eq('id', recipe.id);
-  
-  if (recipeError) throw recipeError;
-  
-  // 2. Delete existing recipe items
-  const { error: deleteError } = await supabase
-    .from('recipe_items')
-    .delete()
-    .eq('recipe_id', recipe.id);
-  
-  if (deleteError) throw deleteError;
-  
-  // 3. Insert new recipe items
-  const recipeItems = formData.items.map(item => ({
-    recipe_id: recipe.id,
-    raw_material_id: item.raw_material_id,
-    quantity: item.quantity
-  }));
-  
-  const { error: itemsError } = await supabase
-    .from('recipe_items')
-    .insert(recipeItems);
-  
-  if (itemsError) throw itemsError;
-} else {
-  // Insert new recipe
-  const { data: recipeData, error: recipeError } = await supabase
-    .from('product_recipes')
-    .insert({
-      name: formData.name,
-      description: formData.description || null,
-      final_product_id: formData.final_product_id,
-      yield_quantity: formData.yield_quantity,
-      is_active: formData.is_active
-    })
-    .select();
-  
-  if (recipeError) throw recipeError;
-  
-  // Insert recipe items
-  if (recipeData && recipeData.length > 0) {
-    const recipeId = recipeData[0].id;
-    
-    const recipeItems = formData.items.map(item => ({
-      recipe_id: recipeId,
-      raw_material_id: item.raw_material_id,
-      quantity: item.quantity
-    }));
-    
-    const { error: itemsError } = await supabase
-      .from('recipe_items')
-      .insert(recipeItems);
-    
-    if (itemsError) throw itemsError;
+    // Call the onSubmit callback (usually refreshes the list)
+    onSubmit();
+  } catch (error: any) {
+    console.error('Error saving recipe:', error);
+    setError(error.message || 'Failed to save recipe. Please try again.');
+    setLoading(false);
   }
 }
-        // Insert new recipe
-        const { data: recipeData, error: recipeError } = await supabase
-          .from('product_recipes')
-          .insert({
-            name: formData.name,
-            description: formData.description || null,
-            final_product_id: formData.final_product_id,
-            yield_quantity: formData.yield_quantity,
-            is_active: formData.is_active
-          })
-          .select()
-        
-        if (recipeError) throw recipeError
-        
-        // Insert recipe items
-        if (recipeData && recipeData.length > 0) {
-          const recipeId = recipeData[0].id
-          
-          const recipeItems = formData.items.map(item => ({
-            recipe_id: recipeId,
-            raw_material_id: item.raw_material_id,
-            quantity: item.quantity
-          }))
-          
-          const { error: itemsError } = await supabase
-            .from('recipe_items')
-            .insert(recipeItems)
-          
-          if (itemsError) throw itemsError
-        }
-      }
-
-      // Also update the final product to mark it as recipe-based
-      const { error: updateProductError } = await supabase
-        .from('final_products')
-        .update({ is_recipe_based: true })
-        .eq('id', formData.final_product_id)
-      
-      if (updateProductError) throw updateProductError
-
-      // Call the onSubmit callback (usually refreshes the list)
-      onSubmit()
-    } catch (error: any) {
-      console.error('Error saving recipe:', error)
-      setError(error.message || 'Failed to save recipe. Please try again.')
-      setLoading(false)
-    }
-  }
 
   const selectedProductUnit = finalProducts.find(p => p.id === formData.final_product_id)?.unit || 'unit';
 
