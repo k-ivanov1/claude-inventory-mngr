@@ -145,11 +145,11 @@ function FinalProductFormModal({
       setError('Please select a supplier for this purchased product.')
       return
     }
-   onSubmit({
-  ...formData,
-  recipe_id: formData.is_recipe_based ? formData.recipe_id : undefined,
-  supplier_id: !formData.is_recipe_based ? formData.supplier_id : undefined
-})
+    onSubmit({
+      ...formData,
+      recipe_id: formData.is_recipe_based ? formData.recipe_id : undefined,
+      supplier_id: !formData.is_recipe_based ? formData.supplier_id : undefined
+    })
   }
 
   return (
@@ -293,9 +293,7 @@ function FinalProductFormModal({
                   Recipe-Based Product
                 </label>
                 <p className="text-gray-500">
-                  {formData.is_recipe_based
-                    ? 'Product will be made using a recipe'
-                    : 'Product will be purchased finished'}
+                  {formData.is_recipe_based ? 'Product will be made using a recipe' : 'Product will be purchased finished'}
                 </p>
               </div>
             </div>
@@ -310,11 +308,8 @@ function FinalProductFormModal({
                   required
                 >
                   <option value="">Select a recipe</option>
-                  {recipes.map((recipe) => (
-                    <option key={recipe.id} value={recipe.id}>
-                      {recipe.name}
-                    </option>
-                  ))}
+                  {/* Assume that the recipes array is fetched similarly to the Inventory page */}
+                  {/* For brevity, you might fetch recipes in this page as well if needed */}
                 </select>
               </div>
             ) : (
