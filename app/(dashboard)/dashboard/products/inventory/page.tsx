@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Plus, Edit2, Trash2, Search, AlertTriangle, Filter, ChevronDown } from 'lucide-react'
 
-// Inventory item interface to match the database schema
+// Inventory item interface for the unified inventory table
 interface InventoryItem {
   id: string
   product_name: string
@@ -18,87 +18,7 @@ interface InventoryItem {
   last_updated?: string
 }
 
-// Optional: Manual Adjustment Modal Component for manual stock adjustments
-interface ManualAdjustmentModalProps {
-  item: InventoryItem
-  onClose: () => void
-  onSubmit: (quantity: number, reason: string) => void
-}
-
-function ManualAdjustmentModal({ item, onClose, onSubmit }: ManualAdjustmentModalProps) {
-  const [quantity, setQuantity] = useState(0)
-  const [reason, setReason] = useState('')
-  const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove'>('add')
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (quantity <= 0) {
-      alert('Quantity must be a positive number')
-      return
-    }
-    const finalQuantity = adjustmentType === 'remove' ? -quantity : quantity
-    onSubmit(finalQuantity, reason)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-        <h3 className="text-lg font-semibold mb-4">Manual Inventory Adjustment</h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Adjustment Type</label>
-            <select
-              value={adjustmentType}
-              onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'remove')}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-            >
-              <option value="add">Add Stock</option>
-              <option value="remove">Remove Stock</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Quantity</label>
-            <input
-              type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(parseFloat(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-              min="1"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Reason</label>
-            <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-              required
-            />
-          </div>
-          <div className="flex justify-end gap-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 border"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white"
-            >
-              {adjustmentType === 'add' ? 'Add Stock' : 'Remove Stock'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// Inventory Item Modal Component for adding/editing inventory items
+// Modal component for adding/editing an Inventory Item
 interface InventoryItemModalProps {
   item?: InventoryItem | null
   categories: string[]
@@ -348,96 +268,31 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
               required
             />
           </div>
-          <div className="pt-4 space-y-4 border-t">
-            <div className="flex items-start">
-              <div className="flex h-5 items-center">
-                <input
-                  id="is_recipe_based"
-                  name="is_recipe_based"
-                  type="checkbox"
-                  checked={formData.is_recipe_based}
-                  onChange={handleChange}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-              </div>
-              <div className="ml-3 text-sm">
-                <label htmlFor="is_recipe_based" className="font-medium text-gray-700">
-                  Recipe-Based Product
-                </label>
-                <p className="text-gray-500">
-                  {formData.is_recipe_based ? 'Product will be made using a recipe' : 'Product will be purchased finished'}
-                </p>
-              </div>
-            </div>
-            {formData.is_recipe_based ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Select Recipe</label>
-                <select
-                  name="recipe_id"
-                  value={formData.recipe_id || ''}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                  required
-                >
-                  <option value="">Select a recipe</option>
-                  {recipes.map((recipe) => (
-                    <option key={recipe.id} value={recipe.id}>
-                      {recipe.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Select Supplier</label>
-                <select
-                  name="supplier_id"
-                  value={formData.supplier_id || ''}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                  required
-                >
-                  <option value="">Select a supplier</option>
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-          <div className="pt-4 border-t">
-            <div className="flex items-start">
-              <div className="flex h-5 items-center">
-                <input
-                  id="is_active"
-                  name="is_active"
-                  type="checkbox"
-                  checked={formData.is_active}
-                  onChange={handleChange}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-              </div>
-              <div className="ml-3 text-sm">
-                <label htmlFor="is_active" className="font-medium text-gray-700">Active</label>
-                <p className="text-gray-500">Inactive products won't appear in sales or production</p>
-              </div>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Supplier (Optional)</label>
+            <input
+              type="text"
+              name="supplier"
+              value={formData.supplier}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+            />
           </div>
           <div className="flex justify-end gap-x-3">
             <button
               type="button"
               onClick={onClose}
               className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+              className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+              disabled={loading}
             >
-              {product ? 'Update Product' : 'Add Product'}
+              {loading ? 'Saving...' : item ? 'Update Item' : 'Add Item'}
             </button>
           </div>
         </form>
@@ -446,151 +301,102 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
   )
 }
 
-export default function FinalProductsPage() {
-  const [finalProducts, setFinalProducts] = useState<FinalProduct[]>([])
-  const [filteredProducts, setFilteredProducts] = useState<FinalProduct[]>([])
+export default function InventoryPage() {
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [filteredInventory, setFilteredInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [showForm, setShowForm] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<FinalProduct | null>(null)
-  const [categories, setCategories] = useState<string[]>(['tea', 'coffee', 'gear', 'packaging', 'books'])
-  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
 
   const supabase = createClientComponentClient()
 
   useEffect(() => {
-    fetchFinalProducts()
-    fetchSuppliers()
+    fetchInventoryItems()
     fetchCategories()
   }, [])
 
   useEffect(() => {
-    const term = searchTerm.toLowerCase()
-    const filtered = finalProducts.filter(product =>
-      product.name.toLowerCase().includes(term) ||
-      product.sku.toLowerCase().includes(term) ||
-      product.category.toLowerCase().includes(term)
-    )
-    setFilteredProducts(filtered)
-  }, [searchTerm, finalProducts])
+    let result = inventory
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      result = result.filter(item =>
+        item.product_name.toLowerCase().includes(term) ||
+        item.sku.toLowerCase().includes(term)
+      )
+    }
+    if (selectedCategories.length > 0) {
+      result = result.filter(item => selectedCategories.includes(item.category))
+    }
+    setFilteredInventory(result)
+  }, [searchTerm, inventory, selectedCategories])
 
-  const fetchFinalProducts = async () => {
+  const fetchInventoryItems = async () => {
     setLoading(true)
     setError(null)
     try {
       const { data, error } = await supabase
-        .from('final_products')
+        .from('inventory')
         .select('*')
-        .order('name')
+        .order('product_name', { ascending: true })
       if (error) throw error
-      setFinalProducts(data || [])
+      setInventory(data || [])
     } catch (error: any) {
-      console.error('Error fetching final products:', error)
-      setError(error.message || 'Failed to load final products. Please check your connection or permissions.')
+      console.error('Error fetching inventory:', error)
+      setError('Failed to load inventory. Please try again.')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchSuppliers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('id, name')
-        .eq('is_approved', true)
-      if (error) throw error
-      setSuppliers(data || [])
-    } catch (error: any) {
-      console.error('Error fetching suppliers:', error)
     }
   }
 
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabase
-        .from('product_categories')
-        .select('name')
+        .from('inventory')
+        .select('category')
+        .not('category', 'is', null)
       if (error) throw error
-      if (data && data.length > 0) {
-        setCategories(data.map((category: any) => category.name))
-      }
-    } catch (error: any) {
+      const uniqueCategories = Array.from(new Set(data?.map(item => item.category) || []))
+      setCategories(uniqueCategories)
+    } catch (error) {
       console.error('Error fetching categories:', error)
     }
   }
 
-  const handleAddProduct = async (productData: FinalProduct) => {
-    setError(null)
-    try {
-      if (!productData.name || !productData.category || !productData.unit) {
-        throw new Error('Name, category, and unit are required fields.')
-      }
-      let result
-      if (editingProduct?.id) {
-        result = await supabase
-          .from('final_products')
-          .update({
-            name: productData.name,
-            sku: productData.sku,
-            category: productData.category,
-            unit: productData.unit,
-            is_recipe_based: productData.is_recipe_based,
-            recipe_id: productData.recipe_id,
-            supplier_id: productData.supplier_id,
-            unit_price: productData.unit_price,
-            reorder_point: productData.reorder_point,
-            is_active: productData.is_active
-          })
-          .eq('id', editingProduct.id)
-          .select()
-      } else {
-        result = await supabase
-          .from('final_products')
-          .insert({
-            name: productData.name,
-            sku: productData.sku,
-            category: productData.category,
-            unit: productData.unit,
-            is_recipe_based: productData.is_recipe_based,
-            recipe_id: productData.recipe_id,
-            supplier_id: productData.supplier_id,
-            unit_price: productData.unit_price,
-            reorder_point: productData.reorder_point,
-            is_active: productData.is_active
-          })
-          .select()
-      }
-      if (result.error) throw result.error
-      fetchFinalProducts()
-      setShowForm(false)
-      setEditingProduct(null)
-    } catch (error: any) {
-      console.error('Error saving final product:', error)
-      setError(error.message || 'Failed to save final product. Please check your input and try again.')
-    }
+  const toggleCategoryFilter = (category: string) => {
+    setSelectedCategories(prev =>
+      prev.includes(category)
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    )
   }
 
-  const handleDeleteProduct = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this final product?')) {
+  const handleDeleteItem = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this inventory item?')) {
       try {
         const { error } = await supabase
-          .from('final_products')
+          .from('inventory')
           .delete()
           .eq('id', id)
         if (error) throw error
-        fetchFinalProducts()
+        fetchInventoryItems()
       } catch (error: any) {
-        console.error('Error deleting final product:', error)
-        setError(error.message || 'Failed to delete final product. Please try again.')
+        console.error('Error deleting inventory item:', error)
+        setError('Failed to delete inventory item. Please try again.')
       }
     }
   }
 
-  const handleEditProduct = (product: FinalProduct) => {
-    setEditingProduct(product)
-    setShowForm(true)
-  }
+  const totalInventoryValue = filteredInventory.reduce(
+    (total, item) => total + (item.stock_level * item.unit_price),
+    0
+  )
+  const totalItems = filteredInventory.length
+  const lowStockItems = filteredInventory.filter(item => item.stock_level <= item.reorder_point).length
 
   return (
     <div className="space-y-8">
@@ -608,32 +414,103 @@ export default function FinalProductsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Final Products</h2>
-          <p className="text-gray-600">Manage your finished products catalog</p>
+          <h2 className="text-2xl font-bold">Inventory Management</h2>
+          <p className="text-gray-600">Track and manage your product inventory</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingProduct(null)
-            setShowForm(true)
-          }}
-          className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-        >
-          <Plus className="h-5 w-5" />
-          Add Final Product
-        </button>
+        <div className="flex items-center gap-x-4">
+          <div className="text-sm font-medium text-gray-700">
+            Total Value: <span className="ml-2 text-indigo-600">£{totalInventoryValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+          <button
+            onClick={() => {
+              setEditingItem(null)
+              setShowAddForm(true)
+            }}
+            className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+          >
+            <Plus className="h-5 w-5" />
+            Add Item
+          </button>
+        </div>
       </div>
 
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-gray-400" />
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-indigo-500 rounded-md p-3">
+                <Plus className="h-6 w-6 text-white" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dt className="text-sm font-medium text-gray-500 truncate">Total Items</dt>
+                <dd className="flex items-baseline">
+                  <span className="text-2xl font-semibold text-gray-900">{totalItems}</span>
+                </dd>
+              </div>
+            </div>
+          </div>
         </div>
-        <input
-          type="text"
-          placeholder="Search by name, SKU, or category..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-        />
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
+                <AlertTriangle className="h-6 w-6 text-white" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dt className="text-sm font-medium text-gray-500 truncate">Low Stock Items</dt>
+                <dd className="flex items-baseline">
+                  <span className="text-2xl font-semibold text-red-600">{lowStockItems}</span>
+                </dd>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-4">
+        <div className="relative flex-grow">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search inventory..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          />
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowCategoryFilter(!showCategoryFilter)}
+            className="inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Categories
+            <ChevronDown className="h-4 w-4 ml-2" />
+          </button>
+          {showCategoryFilter && (
+            <div className="absolute z-10 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+              <div className="py-1" role="menu" aria-orientation="vertical">
+                {categories.map((category) => (
+                  <div key={category} className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    <input
+                      type="checkbox"
+                      id={`category-${category}`}
+                      checked={selectedCategories.includes(category)}
+                      onChange={() => toggleCategoryFilter(category)}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded mr-2"
+                    />
+                    <label htmlFor={`category-${category}`} className="ml-2 block text-sm text-gray-700">
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden">
@@ -641,49 +518,67 @@ export default function FinalProductsPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Name</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipe Based</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Level</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reorder Point</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500">Loading...</td>
+                  <td colSpan={8} className="px-4 py-4 text-center text-sm text-gray-500">
+                    Loading inventory...
+                  </td>
                 </tr>
-              ) : filteredProducts.length === 0 ? (
+              ) : filteredInventory.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500">No final products found.</td>
+                  <td colSpan={8} className="px-4 py-4 text-center text-sm text-gray-500">
+                    No inventory items found.
+                  </td>
                 </tr>
               ) : (
-                filteredProducts.map((product) => (
-                  <tr key={product.id}>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{product.name}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.sku}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.category}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.unit}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.is_recipe_based ? 'Yes' : 'No'}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">£{product.unit_price.toFixed(2)}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.reorder_point}</td>
+                filteredInventory.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product_name}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{item.sku}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        product.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
+                        item.stock_level <= item.reorder_point
+                          ? 'bg-red-50 text-red-700'
+                          : item.stock_level <= item.reorder_point * 1.5
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'bg-green-50 text-green-700'
                       }`}>
-                        {product.is_active ? 'Active' : 'Inactive'}
+                        {item.stock_level} {item.unit}
+                        {item.stock_level <= item.reorder_point && (
+                          <AlertTriangle className="ml-1 h-3 w-3" />
+                        )}
                       </span>
                     </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">£{item.unit_price.toFixed(2)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{item.reorder_point}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{item.supplier || '-'}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-x-3">
-                        <button onClick={() => handleEditProduct(product)} className="text-indigo-600 hover:text-indigo-900">
+                        <button
+                          onClick={() => {
+                            setEditingItem(item)
+                            setShowAddForm(true)
+                          }}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
                           <Edit2 className="h-4 w-4" />
                         </button>
-                        <button onClick={() => product.id && handleDeleteProduct(product.id)} className="text-red-600 hover:text-red-900">
+                        <button
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -696,16 +591,20 @@ export default function FinalProductsPage() {
         </div>
       </div>
 
-      {showForm && (
-        <FinalProductFormModal
-          product={editingProduct}
+      {/* Add/Edit Inventory Item Modal */}
+      {showAddForm && (
+        <InventoryItemModal
+          item={editingItem}
           categories={categories}
-          suppliers={suppliers}
           onClose={() => {
-            setShowForm(false)
-            setEditingProduct(null)
+            setShowAddForm(false)
+            setEditingItem(null)
           }}
-          onSubmit={handleAddProduct}
+          onSubmit={() => {
+            setShowAddForm(false)
+            setEditingItem(null)
+            fetchInventoryItems()
+          }}
         />
       )}
     </div>
