@@ -15,9 +15,10 @@ interface InventoryItem {
   unit_price: number
   reorder_point: number
   supplier?: string
+  last_updated?: string
 }
 
-// Manual Adjustment Modal Component (named function)
+// Manual Adjustment Modal Component
 interface ManualAdjustmentModalProps {
   item: InventoryItem
   onClose: () => void
@@ -35,7 +36,7 @@ function ManualAdjustmentModal({ item, onClose, onSubmit }: ManualAdjustmentModa
       alert('Quantity must be a positive number')
       return
     }
-    // If adjustmentType is 'remove', make quantity negative
+    // Make quantity negative if removing stock
     const finalQuantity = adjustmentType === 'remove' ? -quantity : quantity
     onSubmit(finalQuantity, reason)
   }
@@ -98,7 +99,7 @@ function ManualAdjustmentModal({ item, onClose, onSubmit }: ManualAdjustmentModa
   )
 }
 
-// Inventory Item Modal Component (named function)
+// Inventory Item Modal Component
 interface InventoryItemModalProps {
   item?: InventoryItem | null
   categories: string[]
@@ -219,10 +220,7 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
         {error && (
           <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
             <span className="block sm:inline">{error}</span>
-            <span 
-              className="absolute top-0 bottom-0 right-0 px-4 py-3"
-              onClick={() => setError(null)}
-            >
+            <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setError(null)}>
               <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                 <title>Close</title>
                 <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
@@ -230,9 +228,7 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
             </span>
           </div>
         )}
-        <h3 className="text-lg font-semibold mb-4">
-          {item ? 'Edit Inventory Item' : 'Add New Inventory Item'}
-        </h3>
+        <h3 className="text-lg font-semibold mb-4">{item ? 'Edit Inventory Item' : 'Add New Inventory Item'}</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Product Name</label>
@@ -389,7 +385,7 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
   )
 }
 
-// --- InventoryPage Component (Single Default Export) ---
+// --- InventoryPage Component (Only Default Export) ---
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [filteredInventory, setFilteredInventory] = useState<InventoryItem[]>([])
@@ -409,7 +405,6 @@ export default function InventoryPage() {
     fetchCategories()
   }, [])
 
-  // Filter inventory whenever search term, inventory, or selected categories change
   useEffect(() => {
     let result = inventory
     if (searchTerm) {
@@ -485,7 +480,6 @@ export default function InventoryPage() {
     (total, item) => total + (item.stock_level * item.unit_price),
     0
   )
-
   const totalItems = filteredInventory.length
   const lowStockItems = filteredInventory.filter(item => item.stock_level <= item.reorder_point).length
 
@@ -702,19 +696,6 @@ export default function InventoryPage() {
           }}
         />
       )}
-
-      {/* Manual Adjustment Modal */}
-      {/* (Assuming you want a button somewhere to trigger manual adjustment; add your trigger as needed) */}
-      {/* {showManualAdjustment && selectedItem && (
-        <ManualAdjustmentModal
-          item={selectedItem}
-          onClose={() => {
-            setShowManualAdjustment(false)
-            setSelectedItem(null)
-          }}
-          onSubmit={handleManualAdjustment}
-        />
-      )} */}
     </div>
   )
 }
