@@ -6,6 +6,7 @@ import { ReceiveTeaCoffeeForm } from '@/components/inventory/receive-tea-coffee-
 import { ReceiveOtherStockForm } from '@/components/inventory/receive-other-stock-form'
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TeaCoffeeStock, OtherStock } from '@/lib/types/stock'
+import { Search } from 'lucide-react'
 
 export default function ReceiveStockPage() {
   const [activeTab, setActiveTab] = useState('tea-coffee')
