@@ -145,11 +145,11 @@ function FinalProductFormModal({
       setError('Please select a supplier for this purchased product.')
       return
     }
-    onSubmit({
-      ...formData,
-      recipe_id: formData.is_recipe_based ? formData.recipe_id : null,
-      supplier_id: !formData.is_recipe_based ? formData.supplier_id : null
-    })
+   onSubmit({
+  ...formData,
+  recipe_id: formData.is_recipe_based ? formData.recipe_id : undefined,
+  supplier_id: !formData.is_recipe_based ? formData.supplier_id : undefined
+})
   }
 
   return (
