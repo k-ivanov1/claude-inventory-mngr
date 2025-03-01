@@ -174,7 +174,7 @@ export default function SalesPage() {
                           sale.status === 'processing' ? 'bg-yellow-100 text-yellow-800' : 
                           'bg-gray-100 text-gray-800'}`}
                       >
-                        {sale.status?.charAt(0).toUpperCase() + sale.status?.slice(1)}
+                        {sale.status ? sale.status.charAt(0).toUpperCase() + sale.status.slice(1) : ''}
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
