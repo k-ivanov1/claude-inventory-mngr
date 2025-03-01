@@ -7,8 +7,20 @@ import { SalesForm } from '@/components/sales/sales-form'
 import { Eye, Download, Plus, Tag, Calendar, Truck } from 'lucide-react'
 import Link from 'next/link'
 
+// Extended interface to match the actual data structure from Supabase
+interface ExtendedSalesItem {
+  quantity: number;
+  product?: {
+    name: string;
+  };
+}
+
+interface ExtendedSalesOrder extends SalesOrder {
+  items?: ExtendedSalesItem[];
+}
+
 export default function SalesPage() {
-  const [sales, setSales] = useState<SalesOrder[]>([])
+  const [sales, setSales] = useState<ExtendedSalesOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState('all')
@@ -140,7 +152,7 @@ export default function SalesPage() {
                       <ul className="list-disc list-inside">
                         {sale.items?.map((item, index) => (
                           <li key={index} className="truncate max-w-xs">
-                            {item.quantity} x {item.product?.name}
+                            {item.quantity} x {item.product?.name || 'Unknown Product'}
                           </li>
                         ))}
                       </ul>
