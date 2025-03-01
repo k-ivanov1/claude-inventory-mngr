@@ -210,45 +210,77 @@ const calculateTotalCost = () => {
       }
 
       // Start a transaction
-      if (recipe?.id) {
-        // Update existing recipe
-        await supabase.transaction(async (tx) => {
-          // Update recipe
-          const { error: recipeError } = await tx
-            .from('product_recipes')
-            .update({
-              name: formData.name,
-              description: formData.description || null,
-              final_product_id: formData.final_product_id,
-              yield_quantity: formData.yield_quantity,
-              is_active: formData.is_active
-            })
-            .eq('id', recipe.id)
-          
-          if (recipeError) throw recipeError
-          
-          // Delete existing recipe items
-          const { error: deleteError } = await tx
-            .from('recipe_items')
-            .delete()
-            .eq('recipe_id', recipe.id)
-          
-          if (deleteError) throw deleteError
-          
-          // Insert new recipe items
-          const recipeItems = formData.items.map(item => ({
-            recipe_id: recipe.id,
-            raw_material_id: item.raw_material_id,
-            quantity: item.quantity
-          }))
-          
-          const { error: itemsError } = await tx
-            .from('recipe_items')
-            .insert(recipeItems)
-          
-          if (itemsError) throw itemsError
-        })
-      } else {
+// Start a transaction
+if (recipe?.id) {
+  // Update existing recipe
+  // Since we can't use transactions directly, we'll perform operations sequentially
+  
+  // 1. Update recipe
+  const { error: recipeError } = await supabase
+    .from('product_recipes')
+    .update({
+      name: formData.name,
+      description: formData.description || null,
+      final_product_id: formData.final_product_id,
+      yield_quantity: formData.yield_quantity,
+      is_active: formData.is_active
+    })
+    .eq('id', recipe.id);
+  
+  if (recipeError) throw recipeError;
+  
+  // 2. Delete existing recipe items
+  const { error: deleteError } = await supabase
+    .from('recipe_items')
+    .delete()
+    .eq('recipe_id', recipe.id);
+  
+  if (deleteError) throw deleteError;
+  
+  // 3. Insert new recipe items
+  const recipeItems = formData.items.map(item => ({
+    recipe_id: recipe.id,
+    raw_material_id: item.raw_material_id,
+    quantity: item.quantity
+  }));
+  
+  const { error: itemsError } = await supabase
+    .from('recipe_items')
+    .insert(recipeItems);
+  
+  if (itemsError) throw itemsError;
+} else {
+  // Insert new recipe
+  const { data: recipeData, error: recipeError } = await supabase
+    .from('product_recipes')
+    .insert({
+      name: formData.name,
+      description: formData.description || null,
+      final_product_id: formData.final_product_id,
+      yield_quantity: formData.yield_quantity,
+      is_active: formData.is_active
+    })
+    .select();
+  
+  if (recipeError) throw recipeError;
+  
+  // Insert recipe items
+  if (recipeData && recipeData.length > 0) {
+    const recipeId = recipeData[0].id;
+    
+    const recipeItems = formData.items.map(item => ({
+      recipe_id: recipeId,
+      raw_material_id: item.raw_material_id,
+      quantity: item.quantity
+    }));
+    
+    const { error: itemsError } = await supabase
+      .from('recipe_items')
+      .insert(recipeItems);
+    
+    if (itemsError) throw itemsError;
+  }
+}
         // Insert new recipe
         const { data: recipeData, error: recipeError } = await supabase
           .from('product_recipes')
