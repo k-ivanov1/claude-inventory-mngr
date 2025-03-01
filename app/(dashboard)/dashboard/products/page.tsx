@@ -28,6 +28,7 @@ export default function ManageProductsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [categories, setCategories] = useState<string[]>(['tea', 'coffee', 'gear', 'packaging', 'books'])
+  const [error, setError] = useState<string | null>(null)
 
   const supabase = createClientComponentClient()
 
@@ -49,6 +50,7 @@ export default function ManageProductsPage() {
 
   const fetchProducts = async () => {
     setLoading(true)
+    setError(null)
     try {
       const { data, error } = await supabase
         .from('product_recipes')
@@ -58,9 +60,9 @@ export default function ManageProductsPage() {
       if (error) throw error
       
       setProducts(data || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching products:', error)
-      alert('Failed to load products. Please try again.')
+      setError(error.message || 'Failed to load products. Please check your connection or permissions.')
     } finally {
       setLoading(false)
     }
@@ -77,25 +79,48 @@ export default function ManageProductsPage() {
       if (data && data.length > 0) {
         setCategories(data.map(category => category.name))
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching categories:', error)
+      // If fetching categories fails, keep default categories
     }
   }
 
   const handleAddProduct = async (productData: Product) => {
+    setError(null)
     try {
+      // Validate required fields
+      if (!productData.name || !productData.category || !productData.product_type || !productData.unit) {
+        throw new Error('Name, category, product type, and unit are required fields.')
+      }
+
       let result
       if (editingProduct?.id) {
         // Update existing product
         result = await supabase
           .from('product_recipes')
-          .update(productData)
+          .update({
+            name: productData.name,
+            category: productData.category,
+            product_type: productData.product_type,
+            description: productData.description,
+            unit: productData.unit,
+            supplier_id: productData.supplier_id
+          })
           .eq('id', editingProduct.id)
+          .select()
       } else {
         // Insert new product
         result = await supabase
           .from('product_recipes')
-          .insert(productData)
+          .insert({
+            name: productData.name,
+            category: productData.category,
+            product_type: productData.product_type,
+            description: productData.description,
+            unit: productData.unit,
+            supplier_id: productData.supplier_id
+          })
+          .select()
       }
 
       if (result.error) throw result.error
@@ -106,9 +131,9 @@ export default function ManageProductsPage() {
       // Close form
       setShowForm(false)
       setEditingProduct(null)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error)
-      alert('Failed to save product. Please try again.')
+      setError(error.message || 'Failed to save product. Please check your input and try again.')
     }
   }
 
@@ -124,9 +149,9 @@ export default function ManageProductsPage() {
         
         // Refresh products list
         fetchProducts()
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error deleting product:', error)
-        alert('Failed to delete product. Please try again.')
+        setError(error.message || 'Failed to delete product. Please try again.')
       }
     }
   }
@@ -138,6 +163,22 @@ export default function ManageProductsPage() {
 
   return (
     <div className="space-y-8">
+      {/* Error Notification */}
+      {error && (
+        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <span className="block sm:inline">{error}</span>
+          <span 
+            className="absolute top-0 bottom-0 right-0 px-4 py-3"
+            onClick={() => setError(null)}
+          >
+            <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+              <title>Close</title>
+              <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+            </svg>
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Product Management</h2>
@@ -284,21 +325,36 @@ function ProductFormModal({
 
   const [newCategory, setNewCategory] = useState('')
   const [showAddCategory, setShowAddCategory] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const supabase = createClientComponentClient()
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({
-      ...formData,
-      id: product?.id
-    })
+    setError(null)
+
+    // Validate required fields
+    if (!formData.name || !formData.category || !formData.product_type || !formData.unit) {
+      setError('Please fill in all required fields.')
+      return
+    }
+
+    try {
+      const submitData = {
+        ...formData,
+        id: product?.id
+      }
+      
+      onSubmit(submitData)
+    } catch (err: any) {
+      setError(err.message || 'Failed to save product. Please try again.')
+    }
   }
 
   const handleAddCategory = async () => {
     if (!newCategory.trim()) return
 
     try {
-      const supabase = createClientComponentClient()
-      
       // Add new category to database
       const { data, error } = await supabase
         .from('product_categories')
@@ -307,10 +363,7 @@ function ProductFormModal({
       
       if (error) throw error
       
-      // Update local categories
-      categories.push(newCategory.trim().toLowerCase())
-      
-      // Set the newly added category as selected
+      // Update form's category to the new category
       setFormData(prev => ({
         ...prev,
         category: newCategory.trim().toLowerCase()
@@ -319,15 +372,31 @@ function ProductFormModal({
       // Reset and close category input
       setNewCategory('')
       setShowAddCategory(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding category:', error)
-      alert('Failed to add category. Please try again.')
+      setError(error.message || 'Failed to add category. Please try again.')
     }
   }
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        {/* Error Notification */}
+        {error && (
+          <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span className="block sm:inline">{error}</span>
+            <span 
+              className="absolute top-0 bottom-0 right-0 px-4 py-3"
+              onClick={() => setError(null)}
+            >
+              <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                <title>Close</title>
+                <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+              </svg>
+            </span>
+          </div>
+        )}
+
         <h3 className="text-lg font-semibold mb-4">
           {product ? 'Edit Product' : 'Add New Product'}
         </h3>
