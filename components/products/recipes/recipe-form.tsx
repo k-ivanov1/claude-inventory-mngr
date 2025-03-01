@@ -9,6 +9,7 @@ interface RawMaterial {
   name: string
   unit: string
   current_stock?: number
+  unit_cost?: number
 }
 
 interface FinalProduct {
@@ -177,15 +178,15 @@ export function RecipeForm({
     setFormData({ ...formData, items: newItems })
   }
 
-  const calculateTotalCost = () => {
-    // This would normally be calculated based on current raw material prices
-    // For now, we'll return a placeholder value
-    return formData.items.reduce((total, item) => {
-      const material = rawMaterials.find(m => m.id === item.raw_material_id)
-      // In a real app, you'd multiply by the actual unit cost from inventory
-      return total + (item.quantity * (material?.unit_cost || 0))
-    }, 0)
-  }
+const calculateTotalCost = () => {
+  // This would normally be calculated based on current raw material prices
+  // For now, we'll return a placeholder value
+  return formData.items.reduce((total, item) => {
+    const material = rawMaterials.find(m => m.id === item.raw_material_id)
+    // In a real app, you'd multiply by the actual unit cost from inventory
+    return total + (item.quantity * (material?.unit_cost || 0))
+  }, 0)
+}
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
