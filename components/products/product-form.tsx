@@ -1,14 +1,66 @@
-<label className="block text-sm font-medium text-gray-700">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows={2}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-              />
-            </div>
+import React, { useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
+
+interface ProductFormProps {
+  onClose: () => void;
+  editProduct?: any; // adjust your type accordingly
+}
+
+export default function ProductForm({ onClose, editProduct }: ProductFormProps) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    description: '',
+    items: [] as { item_id: string; quantity: number; total_price?: number }[],
+  });
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+  const totalPrice = formData.items.reduce((acc, item) => acc + (item.total_price || 0), 0);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleIngredientChange = (index: number, field: string, value: any) => {
+    const newItems = [...formData.items];
+    // Update the specific field for the ingredient at the given index
+    newItems[index] = { ...newItems[index], [field]: value };
+    setFormData({ ...formData, items: newItems });
+  };
+
+  const handleAddIngredient = () => {
+    setFormData({
+      ...formData,
+      items: [...formData.items, { item_id: '', quantity: 1 }],
+    });
+  };
+
+  const handleRemoveIngredient = (index: number) => {
+    const newItems = formData.items.filter((_, i) => i !== index);
+    setFormData({ ...formData, items: newItems });
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // Form submission logic here
+  };
+
+  return (
+    <div>
+      <div>
+        <form onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Description
+            </label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows={2}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+            />
           </div>
 
           {/* Ingredients Section */}
@@ -46,7 +98,8 @@
                         <option value="">Select an item</option>
                         {inventoryItems.map((inventoryItem) => (
                           <option key={inventoryItem.id} value={inventoryItem.id}>
-                            {inventoryItem.product_name} ({inventoryItem.product_type}) - £{inventoryItem.unit_price?.toFixed(2)}
+                            {inventoryItem.product_name} ({inventoryItem.product_type}) - £
+                            {inventoryItem.unit_price?.toFixed(2)}
                           </option>
                         ))}
                       </select>
@@ -60,7 +113,9 @@
                         min="1"
                         step="1"
                         value={item.quantity}
-                        onChange={(e) => handleIngredientChange(index, 'quantity', parseInt(e.target.value) || 0)}
+                        onChange={(e) =>
+                          handleIngredientChange(index, 'quantity', parseInt(e.target.value) || 0)
+                        }
                         className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                         required
                       />
@@ -92,9 +147,7 @@
           <div className="pt-4 border-t">
             <div className="flex justify-between items-center">
               <h4 className="text-base font-medium text-gray-900">Total Product Cost</h4>
-              <div className="text-lg font-medium text-gray-900">
-                £{totalPrice.toFixed(2)}
-              </div>
+              <div className="text-lg font-medium text-gray-900">£{totalPrice.toFixed(2)}</div>
             </div>
             <p className="text-sm text-gray-500 mt-1">
               This is the calculated cost based on the current prices of ingredients.
@@ -121,4 +174,5 @@
         </form>
       </div>
     </div>
-  )
+  );
+}
