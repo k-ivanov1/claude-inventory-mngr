@@ -15,7 +15,7 @@ interface ExtendedSalesItem {
   };
 }
 
-interface ExtendedSalesOrder extends SalesOrder {
+interface ExtendedSalesOrder extends Omit<SalesOrder, 'items'> {
   items?: ExtendedSalesItem[];
 }
 
