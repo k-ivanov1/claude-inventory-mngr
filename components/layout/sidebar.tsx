@@ -125,8 +125,8 @@ export function Sidebar() {
               </div>
             </button>
             
-            {/* Submenu items */}
-            {isExpanded && (
+           {/* Submenu items */}
+            {isExpanded && item.submenu && (
               <div className="ml-6 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
                 {item.submenu.map(subItem => (
                   <Link
