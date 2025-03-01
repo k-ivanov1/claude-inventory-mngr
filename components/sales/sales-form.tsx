@@ -676,3 +676,4 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
       </div>
     </div>
   )
+}
