@@ -46,9 +46,33 @@ export function ProductRecipeForm({ onClose, onSuccess, editRecipe }: ProductRec
     }
   }
 
- const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  setFormData({
-    ...formData,
-    [e.target.name]: e.target.value,
-  });
-};
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  return (
+    <div>
+      <h2>Product Recipe Form</h2>
+      <input
+        type="text"
+        name="name"
+        value={formData.name}
+        onChange={handleChange}
+        placeholder="Recipe Name"
+      />
+      <input
+        type="text"
+        name="description"
+        value={formData.description}
+        onChange={handleChange}
+        placeholder="Description"
+      />
+      {/* Render more inputs as needed */}
+      <button onClick={onClose}>Close</button>
+      <button onClick={onSuccess}>Submit</button>
+    </div>
+  );
+}
