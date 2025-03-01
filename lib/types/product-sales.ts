@@ -30,6 +30,7 @@ export interface SalesItem {
   quantity: number;
   price_per_unit: number;
   total_price?: number; // Calculated as quantity * price_per_unit
+  product?: ProductRecipe; // Added this line to include the joined product data
 }
 
 export interface SalesOrder {
