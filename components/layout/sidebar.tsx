@@ -1,3 +1,5 @@
+// components/layout/sidebar.tsx
+
 'use client'
 
 import { cn } from '@/lib/utils'
@@ -14,23 +16,44 @@ import {
   Coffee,
   Truck,
   ChevronLeft,
-  Menu
+  Menu,
+  ChevronDown,
+  ChevronRight,
+  Leaf,
+  ShoppingBag,
+  BarChart3
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { useSidebar } from '@/contexts/sidebar-context'
+import { useState } from 'react'
 
-const navigation = [
+// Navigation item with optional submenu
+interface NavItem {
+  name: string
+  href?: string
+  icon: React.ElementType
+  submenu?: NavItem[]
+}
+
+const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { 
+    name: 'Products', 
+    icon: Package,
+    submenu: [
+      { name: 'Raw Materials', href: '/dashboard/products/raw-materials', icon: Leaf },
+      { name: 'Product Recipes', href: '/dashboard/products/recipes', icon: Clipboard },
+      { name: 'Final Products', href: '/dashboard/products/final-products', icon: ShoppingBag },
+      { name: 'Inventory', href: '/dashboard/products/inventory', icon: BarChart3 },
+    ]
+  },
   { name: 'Sales', href: '/dashboard/sales', icon: ShoppingCart },
-  { name: 'Products', href: '/dashboard/products', icon: Coffee },
-  { name: 'Inventory', href: '/dashboard/inventory', icon: Package },
   { name: 'Stock Receiving', href: '/dashboard/stock/receive', icon: PackageOpen },
-  { name: 'Product Recipes', href: '/dashboard/recipes', icon: Clipboard },
-  { name: 'Suppliers', href: '/dashboard/suppliers', icon: Truck },
   { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
+  { name: 'Suppliers', href: '/dashboard/suppliers', icon: Truck },
   { name: 'Team', href: '/dashboard/team', icon: Users },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
@@ -40,10 +63,109 @@ export function Sidebar() {
   const router = useRouter()
   const supabase = createClientComponentClient()
   const { isOpen, toggle } = useSidebar()
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
+    // Automatically expand Products menu if we're on a products page
+    Products: pathname.includes('/dashboard/products')
+  })
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  const toggleSubmenu = (name: string) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [name]: !prev[name]
+    }))
+  }
+
+  const isActive = (href?: string, submenu?: NavItem[]) => {
+    if (href) {
+      return pathname === href || pathname.startsWith(`${href}/`)
+    }
+    if (submenu) {
+      return submenu.some(item => 
+        item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`))
+      )
+    }
+    return false
+  }
+
+  const renderNavItem = (item: NavItem) => {
+    const active = isActive(item.href, item.submenu)
+    const hasSubmenu = item.submenu && item.submenu.length > 0
+    const isExpanded = hasSubmenu && expandedMenus[item.name]
+
+    return (
+      <div key={item.name} className="space-y-1">
+        {hasSubmenu ? (
+          <>
+            <button
+              onClick={() => toggleSubmenu(item.name)}
+              className={cn(
+                'flex w-full items-center justify-between gap-x-3 rounded-lg px-3 py-2 text-sm font-medium',
+                active
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+              )}
+            >
+              <div className="flex items-center gap-x-3">
+                <item.icon className="h-5 w-5 shrink-0" />
+                <span className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
+                  {item.name}
+                </span>
+              </div>
+              <div className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </div>
+            </button>
+            
+            {/* Submenu items */}
+            {isExpanded && (
+              <div className="ml-6 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
+                {item.submenu.map(subItem => (
+                  <Link
+                    key={subItem.name}
+                    href={subItem.href || '#'}
+                    className={cn(
+                      'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium',
+                      isActive(subItem.href)
+                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    )}
+                  >
+                    <subItem.icon className="h-4 w-4 shrink-0" />
+                    <span className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
+                      {subItem.name}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <Link
+            href={item.href || '#'}
+            className={cn(
+              'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium',
+              active
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+            )}
+          >
+            <item.icon className="h-5 w-5 shrink-0" />
+            <span className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
+              {item.name}
+            </span>
+          </Link>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -77,26 +199,7 @@ export function Sidebar() {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium',
-                    isActive
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
-                  )}
-                >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  <span className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
-                    {item.name}
-                  </span>
-                </Link>
-              )
-            })}
+            {navigation.map(renderNavItem)}
           </nav>
 
           {/* Sign out button */}
