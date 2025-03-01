@@ -1,4 +1,3 @@
-// File: app/(dashboard)/dashboard/products/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -10,7 +9,7 @@ import {
   Search 
 } from 'lucide-react'
 
-// Product type to match your database schema
+// Product interface to match database schema
 interface Product {
   id?: string
   name: string
@@ -28,11 +27,13 @@ export default function ManageProductsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [categories, setCategories] = useState<string[]>(['tea', 'coffee', 'gear', 'packaging', 'books'])
 
   const supabase = createClientComponentClient()
 
   useEffect(() => {
     fetchProducts()
+    fetchCategories()
   }, [])
 
   // Filter products whenever search term or products change
@@ -62,6 +63,22 @@ export default function ManageProductsPage() {
       alert('Failed to load products. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('product_categories')
+        .select('name')
+      
+      if (error) throw error
+      
+      if (data && data.length > 0) {
+        setCategories(data.map(category => category.name))
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error)
     }
   }
 
@@ -227,10 +244,11 @@ export default function ManageProductsPage() {
         </div>
       </div>
 
-      {/* Product Form Modal - This would be a separate component */}
+      {/* Product Form Modal */}
       {showForm && (
         <ProductFormModal
           product={editingProduct}
+          categories={categories}
           onClose={() => {
             setShowForm(false)
             setEditingProduct(null)
@@ -242,21 +260,30 @@ export default function ManageProductsPage() {
   )
 }
 
-// Separate component for Product Form Modal (to be created)
+// Separate component for Product Form Modal
 interface ProductFormModalProps {
   product?: Product | null
+  categories: string[]
   onClose: () => void
   onSubmit: (product: Product) => void
 }
 
-function ProductFormModal({ product, onClose, onSubmit }: ProductFormModalProps) {
+function ProductFormModal({ 
+  product, 
+  categories, 
+  onClose, 
+  onSubmit 
+}: ProductFormModalProps) {
   const [formData, setFormData] = useState<Product>({
     name: product?.name || '',
-    category: product?.category || '',
+    category: product?.category || (categories[0] || ''),
     product_type: product?.product_type || '',
     description: product?.description || '',
     unit: product?.unit || '',
   })
+
+  const [newCategory, setNewCategory] = useState('')
+  const [showAddCategory, setShowAddCategory] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -264,6 +291,38 @@ function ProductFormModal({ product, onClose, onSubmit }: ProductFormModalProps)
       ...formData,
       id: product?.id
     })
+  }
+
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) return
+
+    try {
+      const supabase = createClientComponentClient()
+      
+      // Add new category to database
+      const { data, error } = await supabase
+        .from('product_categories')
+        .insert({ name: newCategory.trim().toLowerCase() })
+        .select()
+      
+      if (error) throw error
+      
+      // Update local categories
+      categories.push(newCategory.trim().toLowerCase())
+      
+      // Set the newly added category as selected
+      setFormData(prev => ({
+        ...prev,
+        category: newCategory.trim().toLowerCase()
+      }))
+      
+      // Reset and close category input
+      setNewCategory('')
+      setShowAddCategory(false)
+    } catch (error) {
+      console.error('Error adding category:', error)
+      alert('Failed to add category. Please try again.')
+    }
   }
 
   return (
@@ -275,7 +334,7 @@ function ProductFormModal({ product, onClose, onSubmit }: ProductFormModalProps)
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Name
+              Product Name
             </label>
             <input
               type="text"
@@ -285,22 +344,54 @@ function ProductFormModal({ product, onClose, onSubmit }: ProductFormModalProps)
               required
             />
           </div>
+          
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Category
-            </label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({...formData, category: e.target.value})}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-              required
-            >
-              <option value="">Select Category</option>
-              <option value="tea">Tea</option>
-              <option value="coffee">Coffee</option>
-              <option value="accessories">Accessories</option>
-            </select>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">
+                Category
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowAddCategory(!showAddCategory)}
+                className="text-xs text-indigo-600"
+              >
+                {showAddCategory ? 'Cancel' : 'Add New Category'}
+              </button>
+            </div>
+            
+            {showAddCategory ? (
+              <div className="mt-1 flex space-x-2">
+                <input
+                  type="text"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="New category name"
+                  className="block flex-grow rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCategory}
+                  className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                required
+              >
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Product Type
@@ -313,6 +404,7 @@ function ProductFormModal({ product, onClose, onSubmit }: ProductFormModalProps)
               required
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Unit
@@ -326,6 +418,7 @@ function ProductFormModal({ product, onClose, onSubmit }: ProductFormModalProps)
               required
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Description (Optional)
@@ -337,6 +430,7 @@ function ProductFormModal({ product, onClose, onSubmit }: ProductFormModalProps)
               rows={3}
             />
           </div>
+
           <div className="flex justify-end gap-x-3">
             <button
               type="button"
