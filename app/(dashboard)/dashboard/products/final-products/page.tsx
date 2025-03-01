@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Plus, Edit2, Trash2, Search } from 'lucide-react'
 
-// Final Product interface to match the database schema
+// Final Product interface to match database schema
 interface FinalProduct {
   id?: string
   name: string
@@ -28,12 +28,12 @@ interface FinalProductFormModalProps {
   onSubmit: (product: FinalProduct) => void
 }
 
-function FinalProductFormModal({ 
-  product, 
-  categories, 
+function FinalProductFormModal({
+  product,
+  categories,
   suppliers,
-  onClose, 
-  onSubmit 
+  onClose,
+  onSubmit
 }: FinalProductFormModalProps) {
   const [formData, setFormData] = useState<FinalProduct>({
     name: product?.name || '',
@@ -65,9 +65,7 @@ function FinalProductFormModal({
         .from('product_recipes')
         .select('id, name')
         .eq('is_active', true)
-      
       if (error) throw error
-      
       setRecipes(data || [])
     } catch (error: any) {
       console.error('Error fetching recipes:', error)
@@ -75,25 +73,22 @@ function FinalProductFormModal({
     }
   }
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    
     if (type === 'checkbox') {
       const checkboxInput = e.target as HTMLInputElement
-      setFormData({ 
-        ...formData, 
+      setFormData({
+        ...formData,
         [name]: checkboxInput.checked,
-        ...(name === 'is_recipe_based' && checkboxInput.checked 
-          ? { supplier_id: undefined } 
+        ...(name === 'is_recipe_based' && checkboxInput.checked
+          ? { supplier_id: undefined }
           : { recipe_id: undefined }
         )
       })
     } else if (type === 'number') {
-      setFormData({ 
-        ...formData, 
-        [name]: parseFloat(value) || 0 
+      setFormData({
+        ...formData,
+        [name]: parseFloat(value) || 0
       })
     } else {
       setFormData({ ...formData, [name]: value })
@@ -105,35 +100,28 @@ function FinalProductFormModal({
       setError('Please select a category first to generate SKU')
       return
     }
-    
     const prefix = formData.category.substring(0, 3).toUpperCase()
     const timestamp = Date.now().toString().substring(9, 13)
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-    
     const sku = `${prefix}-${timestamp}${random}`
     setFormData({ ...formData, sku })
   }
 
   const handleAddCategory = async () => {
     if (!newCategory.trim()) return
-    
     if (categories.includes(newCategory.toLowerCase())) {
       setError('This category already exists')
       return
     }
-    
     try {
       const { error } = await supabase
         .from('product_categories')
         .insert({ name: newCategory.trim().toLowerCase() })
-      
       if (error) throw error
-      
       setFormData(prev => ({
         ...prev,
         category: newCategory.trim().toLowerCase()
       }))
-      
       setNewCategory('')
       setShowAddCategory(false)
     } catch (error: any) {
@@ -145,22 +133,18 @@ function FinalProductFormModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-
     if (!formData.name || !formData.category || !formData.unit) {
       setError('Name, category, and unit are required fields.')
       return
     }
-
     if (formData.is_recipe_based && !formData.recipe_id) {
       setError('Please select a recipe for this recipe-based product.')
       return
     }
-
     if (!formData.is_recipe_based && !formData.supplier_id) {
       setError('Please select a supplier for this purchased product.')
       return
     }
-
     onSubmit({
       ...formData,
       recipe_id: formData.is_recipe_based ? formData.recipe_id : null,
@@ -174,10 +158,7 @@ function FinalProductFormModal({
         {error && (
           <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
             <span className="block sm:inline">{error}</span>
-            <span 
-              className="absolute top-0 bottom-0 right-0 px-4 py-3"
-              onClick={() => setError(null)}
-            >
+            <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setError(null)}>
               <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                 <title>Close</title>
                 <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
@@ -185,16 +166,12 @@ function FinalProductFormModal({
             </span>
           </div>
         )}
-
         <h3 className="text-lg font-semibold mb-4">
           {product ? 'Edit Final Product' : 'Add New Final Product'}
         </h3>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Product Name
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Product Name</label>
             <input
               type="text"
               name="name"
@@ -204,17 +181,10 @@ function FinalProductFormModal({
               required
             />
           </div>
-          
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">
-                SKU
-              </label>
-              <button
-                type="button"
-                onClick={generateSKU}
-                className="text-xs text-indigo-600"
-              >
+              <label className="block text-sm font-medium text-gray-700">SKU</label>
+              <button type="button" onClick={generateSKU} className="text-xs text-indigo-600">
                 Generate SKU
               </button>
             </div>
@@ -227,21 +197,13 @@ function FinalProductFormModal({
               required
             />
           </div>
-
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">
-                Category
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowAddCategory(!showAddCategory)}
-                className="text-xs text-indigo-600"
-              >
+              <label className="block text-sm font-medium text-gray-700">Category</label>
+              <button type="button" onClick={() => setShowAddCategory(!showAddCategory)} className="text-xs text-indigo-600">
                 {showAddCategory ? 'Cancel' : 'Add New Category'}
               </button>
             </div>
-            
             {showAddCategory ? (
               <div className="mt-1 flex space-x-2">
                 <input
@@ -251,11 +213,7 @@ function FinalProductFormModal({
                   placeholder="New category name"
                   className="block flex-grow rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 />
-                <button
-                  type="button"
-                  onClick={handleAddCategory}
-                  className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-                >
+                <button type="button" onClick={handleAddCategory} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
                   Add
                 </button>
               </div>
@@ -275,11 +233,8 @@ function FinalProductFormModal({
               </select>
             )}
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Unit
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Unit</label>
             <select
               name="unit"
               value={formData.unit}
@@ -296,11 +251,8 @@ function FinalProductFormModal({
               <option value="pack">Pack</option>
             </select>
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Unit Price (£)
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Unit Price (£)</label>
             <input
               type="number"
               name="unit_price"
@@ -312,11 +264,8 @@ function FinalProductFormModal({
               required
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Reorder Point
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Reorder Point</label>
             <input
               type="number"
               name="reorder_point"
@@ -327,7 +276,6 @@ function FinalProductFormModal({
               required
             />
           </div>
-
           <div className="pt-4 space-y-4 border-t">
             <div className="flex items-start">
               <div className="flex h-5 items-center">
@@ -345,18 +293,15 @@ function FinalProductFormModal({
                   Recipe-Based Product
                 </label>
                 <p className="text-gray-500">
-                  {formData.is_recipe_based 
-                    ? 'Product will be made using a recipe' 
+                  {formData.is_recipe_based
+                    ? 'Product will be made using a recipe'
                     : 'Product will be purchased finished'}
                 </p>
               </div>
             </div>
-
             {formData.is_recipe_based ? (
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Select Recipe
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Select Recipe</label>
                 <select
                   name="recipe_id"
                   value={formData.recipe_id || ''}
@@ -374,9 +319,7 @@ function FinalProductFormModal({
               </div>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Select Supplier
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Select Supplier</label>
                 <select
                   name="supplier_id"
                   value={formData.supplier_id || ''}
@@ -394,7 +337,6 @@ function FinalProductFormModal({
               </div>
             )}
           </div>
-
           <div className="pt-4 border-t">
             <div className="flex items-start">
               <div className="flex h-5 items-center">
@@ -408,14 +350,11 @@ function FinalProductFormModal({
                 />
               </div>
               <div className="ml-3 text-sm">
-                <label htmlFor="is_active" className="font-medium text-gray-700">
-                  Active
-                </label>
+                <label htmlFor="is_active" className="font-medium text-gray-700">Active</label>
                 <p className="text-gray-500">Inactive products won't appear in sales or production</p>
               </div>
             </div>
           </div>
-
           <div className="flex justify-end gap-x-3">
             <button
               type="button"
@@ -458,7 +397,7 @@ export default function FinalProductsPage() {
 
   useEffect(() => {
     const term = searchTerm.toLowerCase()
-    const filtered = finalProducts.filter(product => 
+    const filtered = finalProducts.filter(product =>
       product.name.toLowerCase().includes(term) ||
       product.sku.toLowerCase().includes(term) ||
       product.category.toLowerCase().includes(term)
@@ -474,9 +413,7 @@ export default function FinalProductsPage() {
         .from('final_products')
         .select('*')
         .order('name')
-      
       if (error) throw error
-      
       setFinalProducts(data || [])
     } catch (error: any) {
       console.error('Error fetching final products:', error)
@@ -492,9 +429,7 @@ export default function FinalProductsPage() {
         .from('suppliers')
         .select('id, name')
         .eq('is_approved', true)
-      
       if (error) throw error
-      
       setSuppliers(data || [])
     } catch (error: any) {
       console.error('Error fetching suppliers:', error)
@@ -506,9 +441,7 @@ export default function FinalProductsPage() {
       const { data, error } = await supabase
         .from('product_categories')
         .select('name')
-      
       if (error) throw error
-      
       if (data && data.length > 0) {
         setCategories(data.map((category: any) => category.name))
       }
@@ -523,7 +456,6 @@ export default function FinalProductsPage() {
       if (!productData.name || !productData.category || !productData.unit) {
         throw new Error('Name, category, and unit are required fields.')
       }
-
       let result
       if (editingProduct?.id) {
         result = await supabase
@@ -559,9 +491,7 @@ export default function FinalProductsPage() {
           })
           .select()
       }
-
       if (result.error) throw result.error
-
       fetchFinalProducts()
       setShowForm(false)
       setEditingProduct(null)
@@ -578,9 +508,7 @@ export default function FinalProductsPage() {
           .from('final_products')
           .delete()
           .eq('id', id)
-        
         if (error) throw error
-        
         fetchFinalProducts()
       } catch (error: any) {
         console.error('Error deleting final product:', error)
@@ -599,10 +527,7 @@ export default function FinalProductsPage() {
       {error && (
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <span className="block sm:inline">{error}</span>
-          <span 
-            className="absolute top-0 bottom-0 right-0 px-4 py-3"
-            onClick={() => setError(null)}
-          >
+          <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setError(null)}>
             <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
               <title>Close</title>
               <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
@@ -646,15 +571,15 @@ export default function FinalProductsPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipe Based</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reorder Point</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipe Based</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reorder Point</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -678,25 +603,17 @@ export default function FinalProductsPage() {
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.reorder_point}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        product.is_active 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
+                        product.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                       }`}>
                         {product.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-x-3">
-                        <button
-                          onClick={() => handleEditProduct(product)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
+                        <button onClick={() => handleEditProduct(product)} className="text-indigo-600 hover:text-indigo-900">
                           <Edit2 className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => product.id && handleDeleteProduct(product.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
+                        <button onClick={() => product.id && handleDeleteProduct(product.id)} className="text-red-600 hover:text-red-900">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
