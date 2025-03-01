@@ -118,29 +118,38 @@ export default function RawMaterialsPage() {
     }
   }
 
-  const fetchCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('raw_materials')
-        .select('category')
-        .not('category', 'is', null)
+const fetchCategories = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('raw_materials')
+      .select('category')
+      .not('category', 'is', null)
+    
+    if (error) throw error
+    
+    if (data && data.length > 0) {
+      // Create an object to track unique categories instead of using Set
+      const categoryMap: Record<string, boolean> = {};
       
-      if (error) throw error
-      
-      if (data && data.length > 0) {
-        // Extract unique categories
-        const uniqueCategories = [...new Set(data.map(item => item.category))]
-          .filter(Boolean) as string[]
-        
-        if (uniqueCategories.length > 0) {
-          setCategories(uniqueCategories)
+      // Add each category to the map
+      data.forEach(item => {
+        if (item.category) {
+          categoryMap[item.category] = true;
         }
+      });
+      
+      // Convert the object keys to an array
+      const uniqueCategories = Object.keys(categoryMap);
+      
+      if (uniqueCategories.length > 0) {
+        setCategories(uniqueCategories);
       }
-    } catch (error: any) {
-      console.error('Error fetching categories:', error)
-      // If fetching categories fails, keep default categories
     }
+  } catch (error: any) {
+    console.error('Error fetching categories:', error);
+    // If fetching categories fails, keep default categories
   }
+}
 
   const handleDeleteMaterial = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this raw material?')) {
