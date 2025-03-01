@@ -12,6 +12,7 @@ import {
   PackageOpen,
   Clipboard,
   Coffee,
+  Truck,
   ChevronLeft,
   Menu
 } from 'lucide-react'
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Inventory', href: '/dashboard/inventory', icon: Package },
   { name: 'Stock Receiving', href: '/dashboard/stock/receive', icon: PackageOpen },
   { name: 'Product Recipes', href: '/dashboard/recipes', icon: Clipboard },
+  { name: 'Suppliers', href: '/dashboard/suppliers', icon: Truck },
   { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
   { name: 'Team', href: '/dashboard/team', icon: Users },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
