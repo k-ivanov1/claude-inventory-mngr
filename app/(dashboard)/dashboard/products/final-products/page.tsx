@@ -1,0 +1,795 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  Search 
+} from 'lucide-react'
+
+// Final Product interface to match database schema
+interface FinalProduct {
+  id?: string
+  name: string
+  sku: string
+  category: string
+  unit: string
+  is_recipe_based: boolean
+  recipe_id?: string
+  supplier_id?: string
+  unit_price: number
+  reorder_point: number
+  is_active: boolean
+}
+
+export default function FinalProductsPage() {
+  const [finalProducts, setFinalProducts] = useState<FinalProduct[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<FinalProduct[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<FinalProduct | null>(null)
+  const [categories, setCategories] = useState<string[]>(['tea', 'coffee', 'gear', 'packaging', 'books'])
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  const supabase = createClientComponentClient()
+
+  useEffect(() => {
+    fetchFinalProducts()
+    fetchSuppliers()
+    fetchCategories()
+  }, [])
+
+  // Filter products whenever search term or products change
+  useEffect(() => {
+    const term = searchTerm.toLowerCase()
+    const filtered = finalProducts.filter(product => 
+      product.name.toLowerCase().includes(term) ||
+      product.sku.toLowerCase().includes(term) ||
+      product.category.toLowerCase().includes(term)
+    )
+    setFilteredProducts(filtered)
+  }, [searchTerm, finalProducts])
+
+  const fetchFinalProducts = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data, error } = await supabase
+        .from('final_products')
+        .select('*')
+        .order('name')
+      
+      if (error) throw error
+      
+      setFinalProducts(data || [])
+    } catch (error: any) {
+      console.error('Error fetching final products:', error)
+      setError(error.message || 'Failed to load final products. Please check your connection or permissions.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchSuppliers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name')
+        .eq('is_approved', true)
+      
+      if (error) throw error
+      
+      setSuppliers(data || [])
+    } catch (error: any) {
+      console.error('Error fetching suppliers:', error)
+    }
+  }
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('product_categories')
+        .select('name')
+      
+      if (error) throw error
+      
+      if (data && data.length > 0) {
+        setCategories(data.map(category => category.name))
+      }
+    } catch (error: any) {
+      console.error('Error fetching categories:', error)
+      // If fetching categories fails, keep default categories
+    }
+  }
+
+  const handleAddProduct = async (productData: FinalProduct) => {
+    setError(null)
+    try {
+      // Validate required fields
+      if (!productData.name || !productData.category || !productData.unit) {
+        throw new Error('Name, category, and unit are required fields.')
+      }
+
+      let result
+      if (editingProduct?.id) {
+        // Update existing product
+        result = await supabase
+          .from('final_products')
+          .update({
+            name: productData.name,
+            sku: productData.sku,
+            category: productData.category,
+            unit: productData.unit,
+            is_recipe_based: productData.is_recipe_based,
+            recipe_id: productData.recipe_id,
+            supplier_id: productData.supplier_id,
+            unit_price: productData.unit_price,
+            reorder_point: productData.reorder_point,
+            is_active: productData.is_active
+          })
+          .eq('id', editingProduct.id)
+          .select()
+      } else {
+        // Insert new product
+        result = await supabase
+          .from('final_products')
+          .insert({
+            name: productData.name,
+            sku: productData.sku,
+            category: productData.category,
+            unit: productData.unit,
+            is_recipe_based: productData.is_recipe_based,
+            recipe_id: productData.recipe_id,
+            supplier_id: productData.supplier_id,
+            unit_price: productData.unit_price,
+            reorder_point: productData.reorder_point,
+            is_active: productData.is_active
+          })
+          .select()
+      }
+
+      if (result.error) throw result.error
+
+      // Refresh final products list
+      fetchFinalProducts()
+      
+      // Close form
+      setShowForm(false)
+      setEditingProduct(null)
+    } catch (error: any) {
+      console.error('Error saving final product:', error)
+      setError(error.message || 'Failed to save final product. Please check your input and try again.')
+    }
+  }
+
+  const handleDeleteProduct = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this final product?')) {
+      try {
+        const { error } = await supabase
+          .from('final_products')
+          .delete()
+          .eq('id', id)
+        
+        if (error) throw error
+        
+        // Refresh final products list
+        fetchFinalProducts()
+      } catch (error: any) {
+        console.error('Error deleting final product:', error)
+        setError(error.message || 'Failed to delete final product. Please try again.')
+      }
+    }
+  }
+
+  const handleEditProduct = (product: FinalProduct) => {
+    setEditingProduct(product)
+    setShowForm(true)
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Error Notification */}
+      {error && (
+        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <span className="block sm:inline">{error}</span>
+          <span 
+            className="absolute top-0 bottom-0 right-0 px-4 py-3"
+            onClick={() => setError(null)}
+          >
+            <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+              <title>Close</title>
+              <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+            </svg>
+          </span>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Final Products</h2>
+          <p className="text-gray-600">Manage your finished products catalog</p>
+        </div>
+        <button
+          onClick={() => {
+            setEditingProduct(null)
+            setShowForm(true)
+          }}
+          className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+        >
+          <Plus className="h-5 w-5" />
+          Add Final Product
+        </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search className="h-5 w-5 text-gray-400" />
+        </div>
+        <input
+          type="text"
+          placeholder="Search by name, SKU, or category..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      {/* Final Products Table */}
+      <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  SKU
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Category
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Unit
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Recipe Based
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Unit Price
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Reorder Point
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500">
+                    No final products found.
+                  </td>
+                </tr>
+              ) : (
+                filteredProducts.map((product) => (
+                  <tr key={product.id}>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {product.name}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {product.sku}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {product.category}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {product.unit}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {product.is_recipe_based ? 'Yes' : 'No'}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      £{product.unit_price.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {product.reorder_point}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        product.is_active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {product.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center gap-x-3">
+                        <button
+                          onClick={() => handleEditProduct(product)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => product.id && handleDeleteProduct(product.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Final Product Form Modal */}
+      {showForm && (
+        <FinalProductFormModal
+          product={editingProduct}
+          categories={categories}
+          suppliers={suppliers}
+          onClose={() => {
+            setShowForm(false)
+            setEditingProduct(null)
+          }}
+          onSubmit={handleAddProduct}
+        />
+      )}
+    </div>
+  )
+}
+
+// Separate component for Final Product Form Modal
+interface FinalProductFormModalProps {
+  product?: FinalProduct | null
+  categories: string[]
+  suppliers: any[]
+  onClose: () => void
+  onSubmit: (product: FinalProduct) => void
+}
+
+function FinalProductFormModal({ 
+  product, 
+  categories, 
+  suppliers,
+  onClose, 
+  onSubmit 
+}: FinalProductFormModalProps) {
+  const [formData, setFormData] = useState<FinalProduct>({
+    name: product?.name || '',
+    sku: product?.sku || '',
+    category: product?.category || (categories[0] || ''),
+    unit: product?.unit || 'piece',
+    is_recipe_based: product?.is_recipe_based || false,
+    recipe_id: product?.recipe_id || undefined,
+    supplier_id: product?.supplier_id || undefined,
+    unit_price: product?.unit_price || 0,
+    reorder_point: product?.reorder_point || 5,
+    is_active: product?.is_active ?? true
+  })
+
+  const [recipes, setRecipes] = useState<any[]>([])
+  const [newCategory, setNewCategory] = useState('')
+  const [showAddCategory, setShowAddCategory] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const supabase = createClientComponentClient()
+
+  useEffect(() => {
+    fetchRecipes()
+  }, [])
+
+  const fetchRecipes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('product_recipes')
+        .select('id, name')
+        .eq('is_active', true)
+      
+      if (error) throw error
+      
+      setRecipes(data || [])
+    } catch (error: any) {
+      console.error('Error fetching recipes:', error)
+      setError('Failed to load recipes. Some functionality may be limited.')
+    }
+  }
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value, type } = e.target
+    
+    // Handle checkbox separately
+    if (type === 'checkbox') {
+      const checkboxInput = e.target as HTMLInputElement
+      setFormData({ 
+        ...formData, 
+        [name]: checkboxInput.checked,
+        // Reset recipe or supplier based on recipe-based flag
+        ...(name === 'is_recipe_based' && checkboxInput.checked 
+          ? { supplier_id: undefined } 
+          : { recipe_id: undefined }
+        )
+      })
+    } else if (type === 'number') {
+      setFormData({ 
+        ...formData, 
+        [name]: parseFloat(value) || 0 
+      })
+    } else {
+      setFormData({ ...formData, [name]: value })
+    }
+  }
+
+  const generateSKU = () => {
+    if (!formData.category) {
+      setError('Please select a category first to generate SKU')
+      return
+    }
+    
+    // Generate a SKU based on category prefix and a timestamp
+    const prefix = formData.category.substring(0, 3).toUpperCase()
+    const timestamp = Date.now().toString().substring(9, 13) // Get last 4 digits of timestamp
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+    
+    const sku = `${prefix}-${timestamp}${random}`
+    setFormData({...formData, sku})
+  }
+
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) return
+    
+    // Check if category already exists
+    if (categories.includes(newCategory.toLowerCase())) {
+      setError('This category already exists')
+      return
+    }
+    
+    try {
+      // Save to database
+      const { error } = await supabase
+        .from('product_categories')
+        .insert({ name: newCategory.trim().toLowerCase() })
+      
+      if (error) throw error
+      
+      // Update form's category to the new category
+      setFormData(prev => ({
+        ...prev,
+        category: newCategory.trim().toLowerCase()
+      }))
+      
+      // Reset and close category input
+      setNewCategory('')
+      setShowAddCategory(false)
+    } catch (error: any) {
+      console.error('Error adding category:', error)
+      setError(error.message || 'Failed to add category. Please try again.')
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    // Validate required fields
+    if (!formData.name || !formData.category || !formData.unit) {
+      setError('Name, category, and unit are required fields.')
+      return
+    }
+
+    // Validate recipe-based or supplier selection
+    if (formData.is_recipe_based && !formData.recipe_id) {
+      setError('Please select a recipe for this recipe-based product.')
+      return
+    }
+
+    if (!formData.is_recipe_based && !formData.supplier_id) {
+      setError('Please select a supplier for this purchased product.')
+      return
+    }
+
+    // Call the onSubmit callback
+    onSubmit({
+      ...formData,
+      // Ensure optional fields are null if not selected
+      recipe_id: formData.is_recipe_based ? formData.recipe_id : null,
+      supplier_id: !formData.is_recipe_based ? formData.supplier_id : null
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        {/* Error Notification */}
+        {error && (
+          <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span className="block sm:inline">{error}</span>
+            <span 
+              className="absolute top-0 bottom-0 right-0 px-4 py-3"
+              onClick={() => setError(null)}
+            >
+              <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                <title>Close</title>
+                <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+              </svg>
+            </span>
+          </div>
+        )}
+
+        <h3 className="text-lg font-semibold mb-4">
+          {product ? 'Edit Final Product' : 'Add New Final Product'}
+        </h3>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Product Name
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              required
+            />
+          </div>
+          
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">
+                SKU
+              </label>
+              <button
+                type="button"
+                onClick={generateSKU}
+                className="text-xs text-indigo-600"
+              >
+                Generate SKU
+              </button>
+            </div>
+            <input
+              type="text"
+              name="sku"
+              value={formData.sku}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              required
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">
+                Category
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowAddCategory(!showAddCategory)}
+                className="text-xs text-indigo-600"
+              >
+                {showAddCategory ? 'Cancel' : 'Add New Category'}
+              </button>
+            </div>
+            
+            {showAddCategory ? (
+              <div className="mt-1 flex space-x-2">
+                <input
+                  type="text"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="New category name"
+                  className="block flex-grow rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCategory}
+                  className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <select
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                required
+              >
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Unit
+            </label>
+            <select
+              name="unit"
+              value={formData.unit}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              required
+            >
+              <option value="piece">Piece</option>
+              <option value="kg">Kilogram (kg)</option>
+              <option value="g">Gram (g)</option>
+              <option value="l">Liter (l)</option>
+              <option value="ml">Milliliter (ml)</option>
+              <option value="box">Box</option>
+              <option value="pack">Pack</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Unit Price (£)
+            </label>
+            <input
+              type="number"
+              name="unit_price"
+              value={formData.unit_price}
+              onChange={handleChange}
+              min="0"
+              step="0.01"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Reorder Point
+            </label>
+            <input
+              type="number"
+              name="reorder_point"
+              value={formData.reorder_point}
+              onChange={handleChange}
+              min="0"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              required
+            />
+          </div>
+
+          {/* Product Source Selection */}
+          <div className="pt-4 space-y-4 border-t">
+            <div className="flex items-start">
+              <div className="flex h-5 items-center">
+                <input
+                  id="is_recipe_based"
+                  name="is_recipe_based"
+                  type="checkbox"
+                  checked={formData.is_recipe_based}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="is_recipe_based" className="font-medium text-gray-700">
+                  Recipe-Based Product
+                </label>
+                <p className="text-gray-500">
+                  {formData.is_recipe_based 
+                    ? 'Product will be made using a recipe' 
+                    : 'Product will be purchased finished'}
+                </p>
+              </div>
+            </div>
+
+            {formData.is_recipe_based ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Select Recipe
+                </label>
+                <select
+                  name="recipe_id"
+                  value={formData.recipe_id || ''}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  required
+                >
+                  <option value="">Select a recipe</option>
+                  {recipes.map((recipe) => (
+                    <option key={recipe.id} value={recipe.id}>
+                      {recipe.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Select Supplier
+                </label>
+                <select
+                  name="supplier_id"
+                  value={formData.supplier_id || ''}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  required
+                >
+                  <option value="">Select a supplier</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4 border-t">
+            <div className="flex items-start">
+              <div className="flex h-5 items-center">
+                <input
+                  id="is_active"
+                  name="is_active"
+                  type="checkbox"
+                  checked={formData.is_active}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="is_active" className="font-medium text-gray-700">
+                  Active
+                </label>
+                <p className="text-gray-500">Inactive products won't appear in sales or production</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+            >
+              {product ? 'Update Product' : 'Add Product'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export default FinalProductsPage
