@@ -36,7 +36,6 @@ function ManualAdjustmentModal({ item, onClose, onSubmit }: ManualAdjustmentModa
       alert('Quantity must be a positive number')
       return
     }
-    // Make quantity negative if removing stock
     const finalQuantity = adjustmentType === 'remove' ? -quantity : quantity
     onSubmit(finalQuantity, reason)
   }
