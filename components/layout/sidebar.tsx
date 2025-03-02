@@ -21,7 +21,11 @@ import {
   ChevronRight,
   Leaf,
   ShoppingBag,
-  BarChart3
+  BarChart3,
+  FileText,
+  File,
+  History,
+  Award
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -52,6 +56,15 @@ const navigation: NavItem[] = [
   },
   { name: 'Sales', href: '/dashboard/sales', icon: ShoppingCart },
   { name: 'Stock Receiving', href: '/dashboard/stock/receive', icon: PackageOpen },
+  { 
+    name: 'Traceability & Compliance', 
+    icon: FileText,
+    submenu: [
+      { name: 'Documents', href: '/dashboard/compliance/documents', icon: File },
+      { name: 'Version Control', href: '/dashboard/compliance/versions', icon: History },
+      { name: 'Accreditations', href: '/dashboard/compliance/accreditations', icon: Award },
+    ]
+  },
   { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
   { name: 'Suppliers', href: '/dashboard/suppliers', icon: Truck },
   { name: 'Team', href: '/dashboard/team', icon: Users },
@@ -65,7 +78,9 @@ export function Sidebar() {
   const { isOpen, toggle } = useSidebar()
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
     // Automatically expand Products menu if we're on a products page
-    Products: pathname.includes('/dashboard/products')
+    Products: pathname.includes('/dashboard/products'),
+    // Also expand Traceability & Compliance menu if on a compliance page
+    'Traceability & Compliance': pathname.includes('/dashboard/compliance')
   })
 
   const handleSignOut = async () => {
