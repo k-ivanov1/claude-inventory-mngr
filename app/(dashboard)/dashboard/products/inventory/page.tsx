@@ -16,6 +16,7 @@ interface InventoryItem {
   reorder_point: number
   supplier?: string
   last_updated?: string
+  is_recipe_based?: boolean
 }
 
 // Modal component for adding/editing an Inventory Item
@@ -37,7 +38,8 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
     unit_price: item?.unit_price || 0,
     reorder_point: item?.reorder_point || 5,
     supplier: item?.supplier || '',
-    last_updated: item?.last_updated || ''
+    last_updated: item?.last_updated || '',
+    is_recipe_based: item?.is_recipe_based || false
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,8 +49,10 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
   const supabase = createClientComponentClient()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target
-    if (type === 'number') {
+    const { name, value, type, checked } = e.target
+    if (type === 'checkbox') {
+      setFormData({ ...formData, [name]: checked })
+    } else if (type === 'number') {
       setFormData({ ...formData, [name]: parseFloat(value) || 0 })
     } else {
       setFormData({ ...formData, [name]: value })
@@ -106,7 +110,8 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
             unit: formData.unit,
             unit_price: formData.unit_price,
             reorder_point: formData.reorder_point,
-            supplier: formData.supplier
+            supplier: formData.supplier,
+            is_recipe_based: formData.is_recipe_based
           })
           .eq('id', item.id)
         if (error) throw error
@@ -121,7 +126,8 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
             unit: formData.unit,
             unit_price: formData.unit_price,
             reorder_point: formData.reorder_point,
-            supplier: formData.supplier
+            supplier: formData.supplier,
+            is_recipe_based: formData.is_recipe_based
           })
         if (error) throw error
       }
@@ -276,6 +282,16 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
               value={formData.supplier}
               onChange={handleChange}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Recipe Based</label>
+            <input
+              name="is_recipe_based"
+              type="checkbox"
+              checked={formData.is_recipe_based}
+              onChange={handleChange}
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
             />
           </div>
           <div className="flex justify-end gap-x-3">
