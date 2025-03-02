@@ -65,7 +65,7 @@ const navigation: NavItem[] = [
     ]
   },
   { 
-    name: 'Traceability & Compliance', 
+    name: 'Compliance', 
     icon: FileText,
     submenu: [
       { name: 'Documents', href: '/dashboard/compliance/documents', icon: File },
