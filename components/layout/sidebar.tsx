@@ -55,7 +55,14 @@ const navigation: NavItem[] = [
     ]
   },
   { name: 'Sales', href: '/dashboard/sales', icon: ShoppingCart },
-  { name: 'Stock In', href: '/dashboard/stock/receive', icon: PackageOpen },
+  {
+    name: 'Stock',
+    icon: PackageOpen,
+    submenu: [
+      { name: 'Stock In', href: '/dashboard/stock/receive', icon: PackageOpen },
+      { name: 'Wastage', href: '/dashboard/stock/wastage', icon: Trash2 },
+    ]
+  },
   { 
     name: 'Traceability & Compliance', 
     icon: FileText,
