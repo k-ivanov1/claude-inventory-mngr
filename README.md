@@ -1,3 +1,6 @@
+
+## File Structure
+```plaintext
 tea-inventory-dashboard/
 │
 ├── app/                        # Next.js application routes and pages
@@ -33,3 +36,4 @@ tea-inventory-dashboard/
 ├── public/                     # Static assets
 │
 └── README.md                   # Project documentation
+```
