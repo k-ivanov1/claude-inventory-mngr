@@ -27,14 +27,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [])
   
   useEffect(() => {
-    // Apply theme to document
+    // Apply theme to document and update background color
     if (theme === 'dark') {
       document.documentElement.classList.add('dark')
+      document.body.style.backgroundColor = 'rgb(17, 24, 39)' // dark mode background (e.g., bg-gray-900)
     } else {
       document.documentElement.classList.remove('dark')
+      document.body.style.backgroundColor = 'rgb(249, 250, 251)' // light mode background (e.g., bg-gray-50)
     }
     
-    // Store preference
+    // Store user preference
     localStorage.setItem('theme', theme)
   }, [theme])
   
