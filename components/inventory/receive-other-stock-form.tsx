@@ -30,6 +30,7 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
     best_before_date: '',   // Now valid if OtherStock includes it
     quantity: 0,
     price_per_unit: 0,
+    package_size: 0,        // Add this missing required property
     is_damaged: false,
     is_accepted: true,
     checked_by: '',
