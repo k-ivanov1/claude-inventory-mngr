@@ -17,6 +17,7 @@ export default function ReceiveStockPage() {
   const [editingTeaCoffee, setEditingTeaCoffee] = useState<TeaCoffeeStock | undefined>()
   const [editingOther, setEditingOther] = useState<OtherStock | undefined>()
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
 
   const supabase = createClientComponentClient()
 
@@ -112,13 +113,42 @@ export default function ReceiveStockPage() {
     }).format(date)
   }
 
+  // Filter function for both tea/coffee and other stocks
+  const filterStocks = (stocks: any[]) => {
+    const term = searchTerm.toLowerCase()
+    return stocks.filter(item => 
+      item.product_name.toLowerCase().includes(term) ||
+      item.supplier.toLowerCase().includes(term) ||
+      item.batch_number.toLowerCase().includes(term)
+    )
+  }
+
+  const filteredTeaCoffeeStocks = filterStocks(teaCoffeeStocks)
+  const filteredOtherStocks = filterStocks(otherStocks)
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Stock Receiving</h2>
-          <p className="text-gray-600">Manage incoming stock and inventory</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Stock Receiving</h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            Manage incoming stock and inventory
+          </p>
         </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+        </div>
+        <input
+          type="text"
+          placeholder="Search by product, supplier, or batch number..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md leading-5 bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-100"
+        />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -152,57 +182,56 @@ export default function ReceiveStockPage() {
         </div>
 
         <TabsContent value="tea-coffee">
-          <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Best Before</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Package</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Kg</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price/Unit</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cost</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    {['Date', 'Product', 'Supplier', 'Batch', 'Best Before', 'Qty', 'Package', 'Total Kg', 'Price/Unit', 'Total Cost', 'Status', 'Actions'].map((header) => (
+                      <th 
+                        key={header} 
+                        scope="col" 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                      >
+                        {header}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {loading ? (
                     <tr>
-                      <td colSpan={12} className="px-4 py-4 text-center text-sm text-gray-500">
+                      <td colSpan={12} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                         Loading...
                       </td>
                     </tr>
-                  ) : teaCoffeeStocks.length === 0 ? (
+                  ) : filteredTeaCoffeeStocks.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="px-4 py-4 text-center text-sm text-gray-500">
+                      <td colSpan={12} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                         No tea/coffee stock records found.
                       </td>
                     </tr>
                   ) : (
-                    teaCoffeeStocks.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatDate(item.date)}</td>
+                    filteredTeaCoffeeStocks.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(item.date)}</td>
                         <td className="px-4 py-2 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{item.product_name}</div>
-                          <div className="text-sm text-gray-500">{item.type}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{item.product_name}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{item.type}</div>
                         </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.supplier}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.batch_number}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatDate(item.best_before_date)}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.quantity}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.package_size}g</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.total_kg?.toFixed(2)}kg</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">£{item.price_per_unit?.toFixed(2)}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">£{item.total_cost?.toFixed(2)}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.supplier}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.batch_number}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(item.best_before_date)}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.quantity}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.package_size}g</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.total_kg?.toFixed(2)}kg</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">£{item.price_per_unit?.toFixed(2)}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">£{item.total_cost?.toFixed(2)}</td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            item.is_accepted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            item.is_accepted 
+                              ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
+                              : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                           }`}>
                             {item.is_accepted ? 'Accepted' : 'Rejected'}
                           </span>
@@ -210,13 +239,13 @@ export default function ReceiveStockPage() {
                         <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={() => handleEditTeaCoffee(item)}
-                            className="text-indigo-600 hover:text-indigo-900 mr-3"
+                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-3"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => item.id && handleDeleteTeaCoffee(item.id)}
-                            className="text-red-600 hover:text-red-900"
+                            className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                           >
                             Delete
                           </button>
@@ -231,50 +260,51 @@ export default function ReceiveStockPage() {
         </TabsContent>
 
         <TabsContent value="other">
-          <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price/Unit</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cost</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    {['Date', 'Product', 'Type', 'Supplier', 'Invoice', 'Qty', 'Price/Unit', 'Total Cost', 'Status', 'Actions'].map((header) => (
+                      <th 
+                        key={header} 
+                        scope="col" 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                      >
+                        {header}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {loading ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500">
+                      <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                         Loading...
                       </td>
                     </tr>
-                  ) : otherStocks.length === 0 ? (
+                  ) : filteredOtherStocks.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500">
+                      <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                         No other stock records found.
                       </td>
                     </tr>
                   ) : (
-                    otherStocks.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatDate(item.date)}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{item.product_name}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.type}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.supplier}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.invoice_number}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.quantity}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">£{item.price_per_unit?.toFixed(2)}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">£{item.total_cost?.toFixed(2)}</td>
+                    filteredOtherStocks.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(item.date)}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{item.product_name}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.type}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.supplier}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.invoice_number}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.quantity}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">£{item.price_per_unit?.toFixed(2)}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">£{item.total_cost?.toFixed(2)}</td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            item.is_accepted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            item.is_accepted 
+                              ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
+                              : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                           }`}>
                             {item.is_accepted ? 'Accepted' : 'Rejected'}
                           </span>
@@ -282,13 +312,13 @@ export default function ReceiveStockPage() {
                         <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={() => handleEditOther(item)}
-                            className="text-indigo-600 hover:text-indigo-900 mr-3"
+                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-3"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => item.id && handleDeleteOther(item.id)}
-                            className="text-red-600 hover:text-red-900"
+                            className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                           >
                             Delete
                           </button>
