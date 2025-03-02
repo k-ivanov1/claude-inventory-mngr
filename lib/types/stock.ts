@@ -31,7 +31,7 @@ export interface OtherStock extends StockBaseFields {
   batch_number: string;
   best_before_date: string;
   package_size: number;  // Added field
-  labelling_matches_specifications?: boolean; // Added this field to match the form usage
+  labelling_matches_specifications: boolean; // Added as a required field to match the form
   total_cost?: number;   // Calculated field
 }
 
