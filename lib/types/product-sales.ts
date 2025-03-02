@@ -30,6 +30,13 @@ export interface SalesItem {
   quantity: number;
   price_per_unit: number;
   total_price?: number; // Calculated as quantity * price_per_unit
+  batch_number?: string;
+  best_before_date?: string;
+  production_date?: string;
+  checked_by?: string;
+  labelling_matches_specs?: boolean;
+  packaging_material_id?: string;
+  packaging_quantity?: number;
   product?: ProductRecipe; // Added this line to include the joined product data
 }
 
@@ -38,13 +45,10 @@ export interface SalesOrder {
   date: string;
   order_number: string;
   customer_name: string;
-  batch_number?: string;
-  best_before_date?: string;
-  production_date?: string;
   delivery_method: string;
-  labelling_matches_specs: boolean;
-  checked_by?: string;
-  total_amount?: number; // Sum of all items total_price
+  delivery_cost: number;
+  is_free_shipping?: boolean;
+  total_amount: number;
   status?: string;
   items: SalesItem[];
   created_at?: string;
