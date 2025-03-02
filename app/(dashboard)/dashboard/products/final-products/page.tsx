@@ -154,7 +154,7 @@ function FinalProductFormModal({
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full p-6">
         {error && (
           <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
             <span className="block sm:inline">{error}</span>
@@ -166,24 +166,24 @@ function FinalProductFormModal({
             </span>
           </div>
         )}
-        <h3 className="text-lg font-semibold mb-4">
+        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
           {product ? 'Edit Final Product' : 'Add New Final Product'}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Product Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Name</label>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
               required
             />
           </div>
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">SKU</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">SKU</label>
               <button type="button" onClick={generateSKU} className="text-xs text-indigo-600">
                 Generate SKU
               </button>
@@ -193,13 +193,13 @@ function FinalProductFormModal({
               name="sku"
               value={formData.sku}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
               required
             />
           </div>
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">Category</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
               <button type="button" onClick={() => setShowAddCategory(!showAddCategory)} className="text-xs text-indigo-600">
                 {showAddCategory ? 'Cancel' : 'Add New Category'}
               </button>
@@ -211,7 +211,7 @@ function FinalProductFormModal({
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   placeholder="New category name"
-                  className="block flex-grow rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  className="block flex-grow rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
                 />
                 <button type="button" onClick={handleAddCategory} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
                   Add
@@ -222,7 +222,7 @@ function FinalProductFormModal({
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
                 required
               >
                 {categories.map((category) => (
@@ -234,12 +234,12 @@ function FinalProductFormModal({
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Unit</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Unit</label>
             <select
               name="unit"
               value={formData.unit}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
               required
             >
               <option value="piece">Piece</option>
@@ -252,7 +252,7 @@ function FinalProductFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Unit Price (£)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Unit Price (£)</label>
             <input
               type="number"
               name="unit_price"
@@ -260,23 +260,23 @@ function FinalProductFormModal({
               onChange={handleChange}
               min="0"
               step="0.01"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Reorder Point</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Reorder Point</label>
             <input
               type="number"
               name="reorder_point"
               value={formData.reorder_point}
               onChange={handleChange}
               min="0"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
               required
             />
           </div>
-          <div className="pt-4 space-y-4 border-t">
+          <div className="pt-4 space-y-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-start">
               <div className="flex h-5 items-center">
                 <input
@@ -285,41 +285,40 @@ function FinalProductFormModal({
                   type="checkbox"
                   checked={formData.is_recipe_based}
                   onChange={handleChange}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600"
                 />
               </div>
               <div className="ml-3 text-sm">
-                <label htmlFor="is_recipe_based" className="font-medium text-gray-700">
+                <label htmlFor="is_recipe_based" className="font-medium text-gray-700 dark:text-gray-300">
                   Recipe-Based Product
                 </label>
-                <p className="text-gray-500">
+                <p className="text-gray-500 dark:text-gray-400">
                   {formData.is_recipe_based ? 'Product will be made using a recipe' : 'Product will be purchased finished'}
                 </p>
               </div>
             </div>
             {formData.is_recipe_based ? (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Select Recipe</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select Recipe</label>
                 <select
                   name="recipe_id"
                   value={formData.recipe_id || ''}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
                   required
                 >
                   <option value="">Select a recipe</option>
                   {/* Assume that the recipes array is fetched similarly to the Inventory page */}
-                  {/* For brevity, you might fetch recipes in this page as well if needed */}
                 </select>
               </div>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Select Supplier</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select Supplier</label>
                 <select
                   name="supplier_id"
                   value={formData.supplier_id || ''}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
                   required
                 >
                   <option value="">Select a supplier</option>
@@ -332,7 +331,7 @@ function FinalProductFormModal({
               </div>
             )}
           </div>
-          <div className="pt-4 border-t">
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-start">
               <div className="flex h-5 items-center">
                 <input
@@ -341,12 +340,12 @@ function FinalProductFormModal({
                   type="checkbox"
                   checked={formData.is_active}
                   onChange={handleChange}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600"
                 />
               </div>
               <div className="ml-3 text-sm">
-                <label htmlFor="is_active" className="font-medium text-gray-700">Active</label>
-                <p className="text-gray-500">Inactive products won't appear in sales or production</p>
+                <label htmlFor="is_active" className="font-medium text-gray-700 dark:text-gray-300">Active</label>
+                <p className="text-gray-500 dark:text-gray-400">Inactive products won't appear in sales or production</p>
               </div>
             </div>
           </div>
@@ -354,7 +353,7 @@ function FinalProductFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              className="rounded-md bg-white dark:bg-gray-700 px-3.5 py-2.5 text-sm font-semibold text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
             >
               Cancel
             </button>
@@ -533,8 +532,8 @@ export default function FinalProductsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Final Products</h2>
-          <p className="text-gray-600">Manage your finished products catalog</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Final Products</h2>
+          <p className="text-gray-600 dark:text-gray-300">Manage your finished products catalog</p>
         </div>
         <button
           onClick={() => {
@@ -550,56 +549,56 @@ export default function FinalProductsPage() {
 
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-gray-400" />
+          <Search className="h-5 w-5 text-gray-400 dark:text-gray-300" />
         </div>
         <input
           type="text"
           placeholder="Search by name, SKU, or category..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         />
       </div>
 
-      <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipe Based</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reorder Point</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Unit</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Recipe Based</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Unit Price</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Reorder Point</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500">Loading...</td>
+                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-300">Loading...</td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500">No final products found.</td>
+                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-300">No final products found.</td>
                 </tr>
               ) : (
                 filteredProducts.map((product) => (
                   <tr key={product.id}>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{product.name}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.sku}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.category}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.unit}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.is_recipe_based ? 'Yes' : 'No'}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">£{product.unit_price.toFixed(2)}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{product.reorder_point}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{product.name}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.sku}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.category}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.unit}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.is_recipe_based ? 'Yes' : 'No'}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">£{product.unit_price.toFixed(2)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{product.reorder_point}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         product.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
+                      } dark:${product.is_active ? 'bg-green-900 text-green-100' : 'bg-gray-700 text-gray-300'}`}>
                         {product.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
