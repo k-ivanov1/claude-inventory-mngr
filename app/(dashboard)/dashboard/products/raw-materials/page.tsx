@@ -55,7 +55,7 @@ export default function RawMaterialsPage() {
     const filtered = rawMaterials.filter(material => 
       material.name.toLowerCase().includes(term) ||
       material.category?.toLowerCase().includes(term) ||
-      material.sku?.toLowerCase().includes(term)
+      material.supplier_name?.toLowerCase().includes(term)
     )
     setFilteredMaterials(filtered)
   }, [searchTerm, rawMaterials])
@@ -87,7 +87,7 @@ export default function RawMaterialsPage() {
       if (materialIds.length > 0) {
         const { data: inventoryData, error: inventoryError } = await supabase
           .from('inventory')
-          .select('*')
+          .select('current_stock, unit, item_id')
           .eq('item_type', 'raw_material')
           .in('item_id', materialIds)
         
@@ -202,7 +202,7 @@ const fetchCategories = async () => {
     <div className="space-y-8">
       {/* Error Notification */}
       {error && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative" role="alert">
           <span className="block sm:inline">{error}</span>
           <span 
             className="absolute top-0 bottom-0 right-0 px-4 py-3"
@@ -218,8 +218,8 @@ const fetchCategories = async () => {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Raw Materials</h2>
-          <p className="text-gray-600">Manage raw materials used in your products</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Raw Materials</h2>
+          <p className="text-gray-600 dark:text-gray-300">Manage raw materials used in your products</p>
         </div>
         <button
           onClick={() => {
@@ -240,84 +240,75 @@ const fetchCategories = async () => {
         </div>
         <input
           type="text"
-          placeholder="Search by name, category, or SKU..."
+          placeholder="Search by name, category, or supplier..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         />
       </div>
 
       {/* Raw Materials Table */}
-      <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Name
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Category
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  SKU
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Unit
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Stock Level
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Unit Price
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Supplier
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     Loading...
                   </td>
                 </tr>
               ) : filteredMaterials.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     No raw materials found.
                   </td>
                 </tr>
               ) : (
                 filteredMaterials.map((material) => (
-                  <tr key={material.id} className={!material.is_active ? 'bg-gray-50' : ''}>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={material.id} className={!material.is_active ? 'bg-gray-50 dark:bg-gray-900' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {material.name}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {material.category || '-'}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {material.sku || '-'}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {material.unit}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       {material.inventory ? (
                         <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
-                          material.inventory.current_stock <= material.reorder_point
-                            ? 'bg-red-50 text-red-700'
+                           material.inventory.current_stock <= material.reorder_point
+                            ? 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200'
                             : material.inventory.current_stock <= material.reorder_point * 1.5
-                            ? 'bg-yellow-50 text-yellow-700'
-                            : 'bg-green-50 text-green-700'
+                            ? 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200'
+                            : 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200'
                         }`}>
                           {material.inventory.current_stock} {material.unit}
                           {material.inventory.current_stock <= material.reorder_point && (
@@ -325,22 +316,17 @@ const fetchCategories = async () => {
                           )}
                         </span>
                       ) : (
-                        <span className="text-gray-400">No stock data</span>
+                        <span className="text-gray-400 dark:text-gray-500">No stock data</span>
                       )}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {material.inventory ? 
-                        `£${material.inventory.unit_price.toFixed(2)}` : 
-                        '-'}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {material.supplier_name || '-'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         material.is_active 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
                       }`}>
                         {material.is_active ? 'Active' : 'Inactive'}
                       </span>
@@ -349,13 +335,13 @@ const fetchCategories = async () => {
                       <div className="flex items-center gap-x-3">
                         <button
                           onClick={() => handleEditMaterial(material)}
-                          className="text-indigo-600 hover:text-indigo-900"
+                          className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => material.id && handleDeleteMaterial(material.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
