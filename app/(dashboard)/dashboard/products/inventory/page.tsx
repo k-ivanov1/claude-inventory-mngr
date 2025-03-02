@@ -49,8 +49,10 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
   const supabase = createClientComponentClient()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type, checked } = e.target
+    const { name, value, type } = e.target
     if (type === 'checkbox') {
+      // Cast e.target to HTMLInputElement to access 'checked'
+      const { checked } = e.target as HTMLInputElement
       setFormData({ ...formData, [name]: checked })
     } else if (type === 'number') {
       setFormData({ ...formData, [name]: parseFloat(value) || 0 })
