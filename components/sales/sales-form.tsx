@@ -115,6 +115,15 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
     }
   }
 
+  // NEW: Define handleAddDeliveryMethod to add a new delivery method
+  const handleAddDeliveryMethod = () => {
+    if (newDeliveryMethod.trim() === '') return
+    const newMethod = { name: newDeliveryMethod.trim(), id: newDeliveryMethod.trim() }
+    setDeliveryMethods([...deliveryMethods, newMethod])
+    setNewDeliveryMethod('')
+    setShowAddDeliveryMethod(false)
+  }
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
@@ -406,7 +415,7 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
 
               <div>
                 <div className="flex items-center justify-between">
-<label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700">
                     Delivery Method
                   </label>
                   <button
