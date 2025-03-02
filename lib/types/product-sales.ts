@@ -59,3 +59,17 @@ export interface DeliveryMethod {
   id?: string;
   name: string;
 }
+
+export interface FinalProduct {
+  id?: string
+  name: string
+  recipe_id?: string
+  recipe_name?: string
+  category: string
+  unit_selling_price: number
+  recipe_cost: number
+  markup: number
+  profit_margin: number
+  profit_per_item: number
+  is_active: boolean
+}
