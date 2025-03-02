@@ -17,9 +17,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      {/* Tailwind classes for light/dark background */}
-      <body className={`${inter.className} bg-white dark:bg-gray-900`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-gray-50 dark:bg-gray-900 min-h-screen">
         <ThemeProvider>
           {children}
         </ThemeProvider>
