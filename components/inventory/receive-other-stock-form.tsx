@@ -23,18 +23,15 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
   const [formData, setFormData] = useState<OtherStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
-    product_type: '',
+    type: '', // Renamed from "product_type" to "type"
     supplier: '',
     invoice_number: '',
-    batch_number: '',
-    best_before_date: '',
     quantity: 0,
-    package_size: 0,
     price_per_unit: 0,
     is_damaged: false,
-    labelling_matches_specifications: true,
     is_accepted: true,
     checked_by: '',
+    // Additional fields from StockBaseFields can be omitted if not needed
   })
 
   // Function to fetch approved suppliers
@@ -133,7 +130,7 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
       .from('inventory')
       .select('*')
       .eq('product_name', stockItem.product_name)
-      .eq('product_type', stockItem.product_type)
+      .eq('product_type', stockItem.type)  // use stockItem.type here
       .single()
 
     const stockValue = stockItem.quantity
@@ -155,13 +152,13 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
         .from('inventory')
         .insert({
           product_name: stockItem.product_name,
-          product_type: stockItem.product_type,
-          category: stockItem.product_type,
+          product_type: stockItem.type, // use stockItem.type here
+          category: stockItem.type, // Using type as category
           supplier: stockItem.supplier,
           stock_level: stockValue,
           unit_price: stockItem.price_per_unit,
           reorder_point: 5,
-          sku: `${stockItem.product_type.substring(0, 3)}-${Date.now()}`,
+          sku: `${stockItem.type.substring(0, 3)}-${Date.now()}`,
         })
     }
   }
@@ -214,8 +211,8 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 Product Type
               </label>
               <select
-                name="product_type"
-                value={formData.product_type}
+                name="type" // Updated name to "type"
+                value={formData.type}
                 onChange={handleChange}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 required
