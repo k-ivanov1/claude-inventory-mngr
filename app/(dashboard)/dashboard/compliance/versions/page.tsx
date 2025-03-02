@@ -36,7 +36,7 @@ export default function VersionsPage() {
 
   useEffect(() => {
     let result = documents
-    
+
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
@@ -45,7 +45,7 @@ export default function VersionsPage() {
         doc.document_number.toLowerCase().includes(term)
       )
     }
-    
+
     // Apply sort
     result = [...result].sort((a, b) => {
       if (sortField === 'last_updated') {
@@ -64,7 +64,7 @@ export default function VersionsPage() {
         return 0
       }
     })
-    
+
     setFilteredDocuments(result)
   }, [searchTerm, documents, sortField, sortDirection])
 
@@ -78,15 +78,15 @@ export default function VersionsPage() {
           *,
           categories:document_categories(name)
         `)
-      
+
       if (error) throw error
-      
+
       // Format data with category name
       const formattedDocs = (data || []).map(doc => ({
         ...doc,
         category_name: doc.categories?.name
       }))
-      
+
       setDocuments(formattedDocs)
     } catch (error: any) {
       console.error('Error fetching documents:', error)
@@ -110,9 +110,9 @@ export default function VersionsPage() {
       setExpandedDocId(null)
       return
     }
-    
+
     setExpandedDocId(docId)
-    
+
     // Only fetch versions if we don't already have them
     if (!versions[docId]) {
       try {
@@ -121,9 +121,9 @@ export default function VersionsPage() {
           .select('*')
           .eq('document_id', docId)
           .order('version_number', { ascending: false })
-        
+
         if (error) throw error
-        
+
         setVersions(prev => ({
           ...prev,
           [docId]: data || []
@@ -181,10 +181,14 @@ export default function VersionsPage() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Document Number
                 </th>
-                <th scope="col" 
+                <th
+                  scope="col"
                   className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                   onClick={() => toggleSort('title')}
                 >
@@ -193,7 +197,8 @@ export default function VersionsPage() {
                     {getSortIcon('title')}
                   </div>
                 </th>
-                <th scope="col" 
+                <th
+                  scope="col"
                   className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                   onClick={() => toggleSort('current_version')}
                 >
@@ -202,7 +207,8 @@ export default function VersionsPage() {
                     {getSortIcon('current_version')}
                   </div>
                 </th>
-                <th scope="col" 
+                <th
+                  scope="col"
                   className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                   onClick={() => toggleSort('last_updated')}
                 >
@@ -211,7 +217,10 @@ export default function VersionsPage() {
                     {getSortIcon('last_updated')}
                   </div>
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Status
                 </th>
               </tr>
@@ -231,9 +240,8 @@ export default function VersionsPage() {
                 </tr>
               ) : (
                 filteredDocuments.map((doc) => (
-                  <>
-                    <tr 
-                      key={doc.id} 
+                  <React.Fragment key={doc.id}>
+                    <tr
                       className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
                         expandedDocId === doc.id ? 'bg-gray-50 dark:bg-gray-700' : ''
                       }`}
@@ -258,28 +266,29 @@ export default function VersionsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          doc.status === 'published' 
-                            ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
-                            : doc.status === 'draft' 
-                            ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' 
-                            : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
-                        }`}>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            doc.status === 'published'
+                              ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                              : doc.status === 'draft'
+                              ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                          }`}
+                        >
                           {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                         </span>
                       </td>
                     </tr>
                     {expandedDocId === doc.id && (
                       <tr>
-                        {expandedDocId === doc.id && (
-                      <tr>
                         <td colSpan={5} className="px-0 py-0">
                           <div className="bg-gray-50 dark:bg-gray-900 p-4 border-t border-b border-gray-200 dark:border-gray-700">
                             <div className="mb-2 flex items-center">
                               <History className="h-5 w-5 mr-2 text-indigo-500" />
-                              <h4 className="text-sm font-medium text-gray-900 dark:text-white">Version History</h4>
+                              <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                Version History
+                              </h4>
                             </div>
-                            
                             {versions[doc.id!]?.length ? (
                               <VersionHistory versions={versions[doc.id!]} documentId={doc.id!} />
                             ) : (
@@ -291,7 +300,7 @@ export default function VersionsPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))
               )}
             </tbody>
