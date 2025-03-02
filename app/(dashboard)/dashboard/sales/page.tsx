@@ -15,8 +15,10 @@ interface ExtendedSalesItem {
   };
 }
 
+// Add batch_number as an optional property
 interface ExtendedSalesOrder extends Omit<SalesOrder, 'items'> {
   items?: ExtendedSalesItem[];
+  batch_number?: string;
 }
 
 export default function SalesPage() {
