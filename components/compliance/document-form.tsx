@@ -135,7 +135,7 @@ export function DocumentForm({
             content: documentData.content,
             status: documentData.status,
             last_updated: documentData.last_updated,
-            current_version: (document.current_version || 1) + 1,
+            current_version: (document!.current_version || 1) + 1,
             is_accreditation: documentData.is_accreditation,
             accreditation_type: documentData.accreditation_type,
             expiry_date: documentData.expiry_date
@@ -174,10 +174,10 @@ export function DocumentForm({
         if (needsNewVersion) {
           const versionData: DocumentVersion = {
             document_id: documentId,
-            version_number: (document?.current_version || 1) + 1,
+            version_number: (document!.current_version || 1) + 1,
             content: formData.content,
             changes: changesSummary || 'Updated document',
-            previous_version: document?.current_version || 1
+            previous_version: document!.current_version || 1
           }
           
           const { error: versionError } = await supabase
