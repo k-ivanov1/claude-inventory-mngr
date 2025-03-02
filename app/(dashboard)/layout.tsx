@@ -16,19 +16,19 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  return (
-    <SidebarProvider>
-      <div className="min-h-screen bg-gray-50">
-        <Sidebar />
-        <div className="lg:pl-64 transition-all duration-300">
-          <TopNav user={session.user} />
-          <main className="py-10">
-            <div className="px-4 sm:px-6 lg:px-8">
-              {children}
-            </div>
-          </main>
-        </div>
+return (
+  <SidebarProvider>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+      <Sidebar />
+      <div className="lg:pl-64 transition-all duration-300">
+        <TopNav user={session.user} />
+        <main className="py-10">
+          <div className="px-4 sm:px-6 lg:px-8">
+            {children}
+          </div>
+        </main>
       </div>
-    </SidebarProvider>
-  )
+    </div>
+  </SidebarProvider>
+)
 }
