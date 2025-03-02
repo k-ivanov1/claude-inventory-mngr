@@ -7,34 +7,28 @@ import {
   Edit2, 
   Trash2, 
   Search,
-  Eye,
-  Clipboard,
-  ChevronRight
+  Eye
 } from 'lucide-react'
 import Link from 'next/link'
-import { RecipeForm } from '@/components/products/recipes/recipe-form'
+import { RecipeForm } from './recipe-form'
 
-// Recipe interfaces
 interface RecipeItem {
   id?: string
   recipe_id?: string
   raw_material_id: string
   raw_material_name?: string
   quantity: number
-  unit?: string
   unit_cost?: number
+  total_cost?: number
 }
 
 interface Recipe {
   id?: string
   name: string
   description?: string
-  final_product_id: string
-  final_product_name?: string
-  yield_quantity: number
-  production_cost?: number
-  is_active: boolean
   items: RecipeItem[]
+  total_price?: number
+  is_active: boolean
 }
 
 export default function ProductRecipesPage() {
@@ -56,8 +50,7 @@ export default function ProductRecipesPage() {
   useEffect(() => {
     const term = searchTerm.toLowerCase()
     const filtered = recipes.filter(recipe => 
-      recipe.name.toLowerCase().includes(term) ||
-      recipe.final_product_name?.toLowerCase().includes(term)
+      recipe.name.toLowerCase().includes(term)
     )
     setFilteredRecipes(filtered)
   }, [searchTerm, recipes])
@@ -66,64 +59,35 @@ export default function ProductRecipesPage() {
     setLoading(true)
     setError(null)
     try {
-      // First, get recipes with final product name
+      // Fetch recipes with their items and calculate total price
       const { data: recipesData, error: recipesError } = await supabase
         .from('product_recipes')
         .select(`
           *,
-          final_products(name)
+          items:recipe_items(
+            *,
+            raw_material:raw_materials(name)
+          )
         `)
         .order('name')
       
       if (recipesError) throw recipesError
       
-      if (!recipesData || recipesData.length === 0) {
-        setRecipes([])
-        setLoading(false)
-        return
-      }
-      
-      // Format recipes with product name
-      const formattedRecipes = recipesData.map(recipe => ({
+      // Format recipes with items and calculate total price
+      const formattedRecipes = (recipesData || []).map(recipe => ({
         ...recipe,
-        final_product_name: recipe.final_products?.name,
-        items: [] // Will be populated with recipe items
-      }))
-      
-      // Now get all recipe items
-      const recipeIds = formattedRecipes.map(r => r.id)
-      const { data: recipeItemsData, error: itemsError } = await supabase
-        .from('recipe_items')
-        .select(`
-          *,
-          raw_materials(name, unit)
-        `)
-        .in('recipe_id', recipeIds)
-      
-      if (itemsError) throw itemsError
-      
-      // Group recipe items by recipe_id
-      const itemsByRecipe: Record<string, RecipeItem[]> = {}
-      
-      recipeItemsData?.forEach(item => {
-        if (!itemsByRecipe[item.recipe_id]) {
-          itemsByRecipe[item.recipe_id] = []
-        }
-        
-        itemsByRecipe[item.recipe_id].push({
+        items: (recipe.items || []).map(item => ({
           ...item,
-          raw_material_name: item.raw_materials?.name,
-          unit: item.raw_materials?.unit
-        })
-      })
-      
-      // Add items to their recipes
-      const recipesWithItems = formattedRecipes.map(recipe => ({
-        ...recipe,
-        items: itemsByRecipe[recipe.id as string] || []
+          raw_material_name: item.raw_material?.name
+        })),
+        // Calculate total price from recipe items
+        total_price: (recipe.items || []).reduce(
+          (total, item) => total + (item.total_cost || 0), 
+          0
+        )
       }))
       
-      setRecipes(recipesWithItems)
+      setRecipes(formattedRecipes)
     } catch (error: any) {
       console.error('Error fetching recipes:', error)
       setError(error.message || 'Failed to load recipes. Please check your connection or permissions.')
@@ -169,7 +133,7 @@ export default function ProductRecipesPage() {
     <div className="space-y-8">
       {/* Error Notification */}
       {error && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative" role="alert">
           <span className="block sm:inline">{error}</span>
           <span 
             className="absolute top-0 bottom-0 right-0 px-4 py-3"
@@ -185,8 +149,10 @@ export default function ProductRecipesPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Product Recipes</h2>
-          <p className="text-gray-600">Create and manage recipes for your final products</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Product Recipes</h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            Create and manage recipes for your products
+          </p>
         </div>
         <button
           onClick={() => {
@@ -203,88 +169,84 @@ export default function ProductRecipesPage() {
       {/* Search Bar */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-gray-400" />
+          <Search className="h-5 w-5 text-gray-400 dark:text-gray-500" />
         </div>
         <input
           type="text"
-          placeholder="Search by name or product..."
+          placeholder="Search by recipe name..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md leading-5 bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-100"
         />
       </div>
 
       {/* Recipes Table */}
-      <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Recipe Name
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Final Product
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Description
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Yield
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Production Cost
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Ingredients
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Total Price
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={6} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     Loading...
                   </td>
                 </tr>
               ) : filteredRecipes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={6} className="pxx-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     No recipes found.
                   </td>
                 </tr>
               ) : (
                 filteredRecipes.map((recipe) => (
-                  <tr key={recipe.id} className={!recipe.is_active ? 'bg-gray-50' : ''}>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={recipe.id} className={!recipe.is_active ? 'bg-gray-50 dark:bg-gray-900' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {recipe.name}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {recipe.final_product_name}
+                    <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
+                      {recipe.description || 'No description'}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {recipe.yield_quantity || 1} {recipe.yield_quantity > 1 ? 'units' : 'unit'}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {recipe.production_cost ? `£${recipe.production_cost.toFixed(2)}` : 'Calculated on production'}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-500">
+                    <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex flex-col">
                         <span className="font-medium">{recipe.items.length} ingredients</span>
-                        <div className="text-xs text-gray-400 mt-1 truncate max-w-xs">
-                          {recipe.items.slice(0, 2).map(item => item.raw_material_name).join(', ')}
+                        <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate max-w-xs">
+                          {recipe.items.slice(0, 2).map(item => 
+                            `${item.raw_material_name} (${item.quantity})`
+                          ).join(', ')}
                           {recipe.items.length > 2 && '...'}
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      £{recipe.total_price?.toFixed(2) || '0.00'}
+                    </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         recipe.is_active 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
                       }`}>
                         {recipe.is_active ? 'Active' : 'Inactive'}
                       </span>
@@ -293,19 +255,19 @@ export default function ProductRecipesPage() {
                       <div className="flex items-center gap-x-3">
                         <Link
                           href={`/dashboard/products/recipes/${recipe.id}`}
-                          className="text-gray-600 hover:text-gray-900"
+                          className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
                         <button
                           onClick={() => handleEditRecipe(recipe)}
-                          className="text-indigo-600 hover:text-indigo-900"
+                          className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => recipe.id && handleDeleteRecipe(recipe.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
