@@ -23,15 +23,17 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
   const [formData, setFormData] = useState<OtherStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
-    type: '', // Renamed from "product_type" to "type"
+    type: '', // Using the correct property name from the interface
     supplier: '',
     invoice_number: '',
+    batch_number: '',       // Now valid if OtherStock includes it
+    best_before_date: '',   // Now valid if OtherStock includes it
     quantity: 0,
     price_per_unit: 0,
     is_damaged: false,
     is_accepted: true,
     checked_by: '',
-    // Additional fields from StockBaseFields can be omitted if not needed
+    // Other StockBaseFields properties like id and created_at are optional
   })
 
   // Function to fetch approved suppliers
@@ -130,7 +132,7 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
       .from('inventory')
       .select('*')
       .eq('product_name', stockItem.product_name)
-      .eq('product_type', stockItem.type)  // use stockItem.type here
+      .eq('product_type', stockItem.type)  // using type for product type
       .single()
 
     const stockValue = stockItem.quantity
@@ -152,8 +154,8 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
         .from('inventory')
         .insert({
           product_name: stockItem.product_name,
-          product_type: stockItem.type, // use stockItem.type here
-          category: stockItem.type, // Using type as category
+          product_type: stockItem.type,
+          category: stockItem.type, // using type as category
           supplier: stockItem.supplier,
           stock_level: stockValue,
           unit_price: stockItem.price_per_unit,
@@ -211,7 +213,7 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 Product Type
               </label>
               <select
-                name="type" // Updated name to "type"
+                name="type"
                 value={formData.type}
                 onChange={handleChange}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
