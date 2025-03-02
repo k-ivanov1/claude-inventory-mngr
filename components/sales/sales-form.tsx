@@ -5,6 +5,13 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { X, Plus, Trash2, RefreshCw } from 'lucide-react'
 import { SalesOrder, SalesItem, DeliveryMethod } from '@/lib/types/product-sales'
 
+interface PackagingMaterial {
+  id: string
+  name: string
+  current_stock: number
+  unit: string
+}
+
 interface SalesFormProps {
   onClose: () => void
   onSuccess?: () => void
@@ -13,7 +20,8 @@ interface SalesFormProps {
 
 export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
   const [loading, setLoading] = useState(false)
-  const [products, setProducts] = useState<any[]>([])
+  const [finalProducts, setFinalProducts] = useState<any[]>([])
+  const [packagingMaterials, setPackagingMaterials] = useState<PackagingMaterial[]>([])
   const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethod[]>([])
   const [newDeliveryMethod, setNewDeliveryMethod] = useState('')
   const [showAddDeliveryMethod, setShowAddDeliveryMethod] = useState(false)
@@ -24,21 +32,20 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
     date: new Date().toISOString().split('T')[0],
     order_number: '',
     customer_name: '',
-    batch_number: '',
-    best_before_date: '',
-    production_date: '',
     delivery_method: 'DPD',
-    labelling_matches_specs: true,
-    checked_by: '',
+    delivery_cost: 0,
+    is_free_shipping: false,
+    total_amount: 0,
     status: 'pending',
     items: []
   })
 
-  // Calculate total amount
-  const totalAmount = formData.items.reduce((sum, item) => {
-    const itemTotal = (item.quantity || 0) * (item.price_per_unit || 0)
-    return sum + itemTotal
-  }, 0)
+  // Calculate total amount including delivery cost
+  const calculateTotalAmount = () => {
+    const itemsTotal = formData.items.reduce((sum, item) => 
+      sum + (item.total_price || 0), 0)
+    return itemsTotal + (formData.delivery_cost || 0)
+  }
 
   useEffect(() => {
     if (editSale) {
@@ -47,23 +54,43 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
       generateOrderNumber()
     }
     
-    fetchProducts()
+    fetchFinalProducts()
+    fetchPackagingMaterials()
     fetchDeliveryMethods()
   }, [editSale])
 
-  const fetchProducts = async () => {
+  const fetchFinalProducts = async () => {
     try {
       const { data, error } = await supabase
-        .from('product_recipes')
+        .from('final_products')
         .select('*')
+        .eq('is_active', true)
         .order('name')
       
       if (error) throw error
       
-      setProducts(data || [])
+      setFinalProducts(data || [])
     } catch (error) {
-      console.error('Error fetching products:', error)
-      alert('Failed to load products. Please try again.')
+      console.error('Error fetching final products:', error)
+      alert('Failed to load final products. Please try again.')
+    }
+  }
+
+  const fetchPackagingMaterials = async () => {
+    try {
+      // Fetch packaging materials from raw materials
+      const { data, error } = await supabase
+        .from('raw_materials')
+        .select('id, name, current_stock, unit')
+        .eq('category', 'packaging')
+        .eq('is_active', true)
+      
+      if (error) throw error
+      
+      setPackagingMaterials(data || [])
+    } catch (error) {
+      console.error('Error fetching packaging materials:', error)
+      alert('Failed to load packaging materials. Please try again.')
     }
   }
 
@@ -95,7 +122,20 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
     
     if (type === 'checkbox') {
       const checkboxInput = e.target as HTMLInputElement
-      setFormData({ ...formData, [name]: checkboxInput.checked })
+      setFormData({ 
+        ...formData, 
+        [name]: checkboxInput.checked,
+        // If free shipping is checked, set delivery cost to 0
+        ...(name === 'is_free_shipping' && checkboxInput.checked && { delivery_cost: 0 })
+      })
+    } else if (type === 'number') {
+      const numberValue = parseFloat(value) || 0
+      setFormData({ 
+        ...formData, 
+        [name]: numberValue,
+        // Update total amount when delivery cost changes
+        ...(name === 'delivery_cost' && { total_amount: calculateTotalAmount() })
+      })
     } else {
       setFormData({ ...formData, [name]: value })
     }
@@ -104,7 +144,18 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
   const handleAddItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { product_id: '', quantity: 1, price_per_unit: 0 }]
+      items: [...formData.items, { 
+        product_id: '', 
+        quantity: 1, 
+        price_per_unit: 0,
+        batch_number: '',
+        best_before_date: '',
+        production_date: '',
+        checked_by: '',
+        labelling_matches_specs: true,
+        packaging_material_id: '',
+        packaging_quantity: 0
+      }]
     })
   }
 
@@ -118,76 +169,34 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
     const newItems = [...formData.items]
     
     if (field === 'product_id') {
-      const selectedProduct = products.find(product => product.id === value)
+      const selectedProduct = finalProducts.find(product => product.id === value)
       newItems[index] = {
         ...newItems[index],
         product_id: value,
         product_name: selectedProduct?.name,
-        price_per_unit: selectedProduct?.price || 0
+        price_per_unit: selectedProduct?.unit_price || 0
       }
-    } else {
-      newItems[index] = { ...newItems[index], [field]: value }
     }
     
-    // Calculate total price for this item
-    if (field === 'quantity' || field === 'price_per_unit' || field === 'product_id') {
+    // For other fields, update as normal
+    newItems[index] = { 
+      ...newItems[index], 
+      [field]: value 
+    }
+    
+    // Calculate total price
+    if (['quantity', 'price_per_unit', 'product_id'].includes(field)) {
       const quantity = field === 'quantity' ? value : newItems[index].quantity
       const price = field === 'price_per_unit' ? value : newItems[index].price_per_unit
-      newItems[index].total_price = quantity * price
+      newItems[index].total_price = (quantity || 0) * (price || 0)
     }
     
-    setFormData({ ...formData, items: newItems })
-  }
-
-  const handleAddDeliveryMethod = async () => {
-    if (!newDeliveryMethod.trim()) return
-    
-    try {
-      // Save to database
-      const { data, error } = await supabase
-        .from('delivery_methods')
-        .insert({ name: newDeliveryMethod })
-        .select()
-      
-      if (error) throw error
-      
-      // Update local state
-      if (data) {
-        setDeliveryMethods([...deliveryMethods, data[0]])
-      }
-      setNewDeliveryMethod('')
-      setShowAddDeliveryMethod(false)
-    } catch (error) {
-      console.error('Error adding delivery method:', error)
-      alert('Failed to add delivery method. Please try again.')
-    }
-  }
-
-  const handleRemoveDeliveryMethod = async (id: string) => {
-    if (confirm(`Are you sure you want to remove this delivery method?`)) {
-      try {
-        // Remove from database
-        const { error } = await supabase
-          .from('delivery_methods')
-          .delete()
-          .eq('id', id)
-        
-        if (error) throw error
-        
-        // Update local state
-        setDeliveryMethods(deliveryMethods.filter(method => method.id !== id))
-        
-        // If current form method is being removed, update to first available
-        const deletedMethod = deliveryMethods.find(method => method.id === id)
-        if (formData.delivery_method === deletedMethod?.name && deliveryMethods.length > 0) {
-          const newMethods = deliveryMethods.filter(method => method.id !== id)
-          setFormData({ ...formData, delivery_method: newMethods[0]?.name || 'DPD' })
-        }
-      } catch (error) {
-        console.error('Error removing delivery method:', error)
-        alert('Failed to remove delivery method. Please try again.')
-      }
-    }
+    // Update form data and recalculate total
+    setFormData({ 
+      ...formData, 
+      items: newItems,
+      total_amount: calculateTotalAmount()
+    })
   }
 
   const generateOrderNumber = () => {
@@ -209,17 +218,20 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
     setLoading(true)
 
     try {
-      // If no order number, generate one
-      if (!formData.order_number) {
-        generateOrderNumber()
+      // Validate required fields
+      if (!formData.customer_name || formData.items.length === 0) {
+        throw new Error('Customer name and at least one product are required.')
       }
+
+      // Update total amount before submitting
+      const totalAmount = calculateTotalAmount()
       
-      // Add the calculated total amount
+      // Prepare data for submission
       const dataToSubmit = {
         ...formData,
         total_amount: totalAmount
       }
-      
+
       let saleId
 
       if (editSale?.id) {
@@ -230,12 +242,9 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
             date: dataToSubmit.date,
             order_number: dataToSubmit.order_number,
             customer_name: dataToSubmit.customer_name,
-            batch_number: dataToSubmit.batch_number,
-            best_before_date: dataToSubmit.best_before_date,
-            production_date: dataToSubmit.production_date,
             delivery_method: dataToSubmit.delivery_method,
-            labelling_matches_specs: dataToSubmit.labelling_matches_specs,
-            checked_by: dataToSubmit.checked_by,
+            delivery_cost: dataToSubmit.delivery_cost,
+            is_free_shipping: dataToSubmit.is_free_shipping,
             total_amount: dataToSubmit.total_amount,
             status: dataToSubmit.status
           })
@@ -261,12 +270,9 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
             date: dataToSubmit.date,
             order_number: dataToSubmit.order_number,
             customer_name: dataToSubmit.customer_name,
-            batch_number: dataToSubmit.batch_number,
-            best_before_date: dataToSubmit.best_before_date,
-            production_date: dataToSubmit.production_date,
             delivery_method: dataToSubmit.delivery_method,
-            labelling_matches_specs: dataToSubmit.labelling_matches_specs,
-            checked_by: dataToSubmit.checked_by,
+            delivery_cost: dataToSubmit.delivery_cost,
+            is_free_shipping: dataToSubmit.is_free_shipping,
             total_amount: dataToSubmit.total_amount,
             status: dataToSubmit.status
           })
@@ -284,7 +290,14 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
           product_id: item.product_id,
           quantity: item.quantity,
           price_per_unit: item.price_per_unit,
-          total_price: item.quantity * item.price_per_unit
+          total_price: item.total_price,
+          batch_number: item.batch_number,
+          best_before_date: item.best_before_date,
+          production_date: item.production_date,
+          checked_by: item.checked_by,
+          labelling_matches_specs: item.labelling_matches_specs,
+          packaging_material_id: item.packaging_material_id,
+          packaging_quantity: item.packaging_quantity
         }))
         
         const { error: itemsError } = await supabase
@@ -292,6 +305,20 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
           .insert(salesItems)
         
         if (itemsError) throw itemsError
+
+        // Update inventory for packaging materials
+        for (const item of salesItems) {
+          if (item.packaging_material_id && item.packaging_quantity) {
+            // Reduce packaging material stock
+            const { error: inventoryError } = await supabase
+              .rpc('update_inventory_level', {
+                p_product_id: item.packaging_material_id,
+                p_quantity: item.packaging_quantity
+              })
+            
+            if (inventoryError) throw inventoryError
+          }
+        }
       }
 
       if (onSuccess) {
@@ -379,7 +406,7 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
 
               <div>
                 <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-gray-700">
+<label className="block text-sm font-medium text-gray-700">
                     Delivery Method
                   </label>
                   <button
@@ -398,7 +425,9 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
                   required
                 >
                   {deliveryMethods.map(method => (
-                    <option key={method.id || method.name} value={method.name}>{method.name}</option>
+                    <option key={method.id || method.name} value={method.name}>
+                      {method.name}
+                    </option>
                   ))}
                 </select>
                 
@@ -423,112 +452,42 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
                         Add
                       </button>
                     </div>
-                    
-                    <div className="max-h-32 overflow-y-auto space-y-1">
-                      {deliveryMethods.map(method => (
-                        <div key={method.id || method.name} className="flex justify-between items-center text-sm">
-                          <span>{method.name}</span>
-                          {method.id && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveDeliveryMethod(method.id!)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setShowAddDeliveryMethod(false)}
-                        className="text-xs text-gray-500"
-                      >
-                        Close
-                      </button>
-                    </div>
                   </div>
                 )}
               </div>
-            </div>
-          </div>
 
-          {/* Production Details Section */}
-          <div className="pt-4 border-t">
-            <h4 className="text-base font-medium text-gray-900 mb-4">Production Details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Batch Number
+                  Delivery Cost (£)
                 </label>
                 <input
-                  type="text"
-                  name="batch_number"
-                  value={formData.batch_number}
+                  type="number"
+                  name="delivery_cost"
+                  min="0"
+                  step="0.01"
+                  value={formData.delivery_cost || 0}
                   onChange={handleChange}
+                  disabled={formData.is_free_shipping}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Best Before Date
-                </label>
-                <input
-                  type="date"
-                  name="best_before_date"
-                  value={formData.best_before_date}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Production Date
-                </label>
-                <input
-                  type="date"
-                  name="production_date"
-                  value={formData.production_date}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Checked By
-                </label>
-                <input
-                  type="text"
-                  name="checked_by"
-                  value={formData.checked_by}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4">
               <div className="flex items-start">
                 <div className="flex h-5 items-center">
                   <input
-                    id="labelling_matches_specs"
-                    name="labelling_matches_specs"
+                    id="is_free_shipping"
+                    name="is_free_shipping"
                     type="checkbox"
-                    checked={formData.labelling_matches_specs}
+                    checked={formData.is_free_shipping}
                     onChange={handleChange}
                     className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                 </div>
                 <div className="ml-3 text-sm">
-                  <label htmlFor="labelling_matches_specs" className="font-medium text-gray-700">
-                    Labelling matches specifications
+                  <label htmlFor="is_free_shipping" className="font-medium text-gray-700">
+                    Free Shipping
                   </label>
+                  <p className="text-gray-500">Check if delivery is free of charge</p>
                 </div>
               </div>
             </div>
@@ -553,71 +512,171 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
                 No products added yet. Add products to this sale.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-6">
                 {formData.items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-4 items-end border-b pb-3">
-                    <div className="col-span-5">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Product
-                      </label>
-                      <select
-                        value={item.product_id}
-                        onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                        required
-                      >
-                        <option value="">Select a product</option>
-                        {products.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name} ({product.product_type}) - £{product.price?.toFixed(2)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Quantity
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                        required
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Price Per Unit
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.price_per_unit}
-                        onChange={(e) => handleItemChange(index, 'price_per_unit', parseFloat(e.target.value) || 0)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                        required
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Total
-                      </label>
-                      <div className="block w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-                        £{item.total_price?.toFixed(2) || '0.00'}
+                  <div key={index} className="border-b pb-4">
+                    <div className="grid grid-cols-12 gap-4 items-end">
+                      <div className="col-span-4">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Product
+                        </label>
+                        <select
+                          value={item.product_id}
+                          onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                          required
+                        >
+                          <option value="">Select a product</option>
+                          {finalProducts.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name} - £{product.unit_price?.toFixed(2)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Quantity
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Price Per Unit
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.price_per_unit}
+                          onChange={(e) => handleItemChange(index, 'price_per_unit', parseFloat(e.target.value) || 0)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Total
+                        </label>
+                        <div className="block w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                          £{item.total_price?.toFixed(2) || '0.00'}
+                        </div>
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(index)}
+                          className="text-red-500 hover:text-red-700 p-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="col-span-1 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItem(index)}
-                        className="text-red-500 hover:text-red-700 p-2"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+
+                    <div className="grid grid-cols-12 gap-4 mt-4">
+                      <div className="col-span-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Batch Number
+                        </label>
+                        <input
+                          type="text"
+                          value={item.batch_number}
+                          onChange={(e) => handleItemChange(index, 'batch_number', e.target.value)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Best Before Date
+                        </label>
+                        <input
+                          type="date"
+                          value={item.best_before_date}
+                          onChange={(e) => handleItemChange(index, 'best_before_date', e.target.value)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Production Date
+                        </label>
+                        <input
+                          type="date"
+                          value={item.production_date}
+                          onChange={(e) => handleItemChange(index, 'production_date', e.target.value)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Checked By
+                        </label>
+                        <input
+                          type="text"
+                          value={item.checked_by}
+                          onChange={(e) => handleItemChange(index, 'checked_by', e.target.value)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-start">
+                        <div className="flex h-5 items-center">
+                          <input
+                            id={`labelling_matches_specs_${index}`}
+                            name={`labelling_matches_specs_${index}`}
+                            type="checkbox"
+                            checked={item.labelling_matches_specs}
+                            onChange={(e) => handleItemChange(index, 'labelling_matches_specs', e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                        </div>
+                        <div className="ml-3 text-sm">
+                          <label 
+                            htmlFor={`labelling_matches_specs_${index}`} 
+                            className="font-medium text-gray-700"
+                          >
+                            Labelling Matches Specifications
+                          </label>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Packaging Material
+                        </label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <select
+                            value={item.packaging_material_id}
+                            onChange={(e) => handleItemChange(index, 'packaging_material_id', e.target.value)}
+                            className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                          >
+                            <option value="">Select Packaging Material</option>
+                            {packagingMaterials.map((material) => (
+                              <option key={material.id} value={material.id}>
+                                {material.name} (Stock: {material.current_stock} {material.unit})
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.packaging_quantity}
+                            onChange={(e) => handleItemChange(index, 'packaging_quantity', parseInt(e.target.value) || 0)}
+                            placeholder="Quantity Used"
+                            className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -650,7 +709,7 @@ export function SalesForm({ onClose, onSuccess, editSale }: SalesFormProps) {
                 Total Amount
               </label>
               <div className="mt-1 block w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-right text-lg font-medium text-gray-900">
-                £{totalAmount.toFixed(2)}
+                £{formData.total_amount?.toFixed(2)}
               </div>
             </div>
           </div>
