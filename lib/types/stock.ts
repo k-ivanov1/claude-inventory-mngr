@@ -28,7 +28,9 @@ export interface TeaCoffeeStock extends StockBaseFields {
 // Other inventory items
 export interface OtherStock extends StockBaseFields {
   type: 'packaging' | 'gear' | 'books' | string; // Flexible type
-  total_cost?: number; // Calculated field (quantity * price_per_unit)
+  batch_number: string;       // Added field
+  best_before_date: string;   // Added field
+  total_cost?: number;        // Calculated field (quantity * price_per_unit)
 }
 
 // Union type for all stock kinds
