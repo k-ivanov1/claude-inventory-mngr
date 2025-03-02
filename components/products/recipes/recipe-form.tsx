@@ -9,13 +9,7 @@ interface RawMaterial {
   name: string
   unit: string
   current_stock?: number
-  unit_cost?: number
-}
-
-interface FinalProduct {
-  id: string
-  name: string
-  unit: string
+  unit_price?: number // Added unit price
 }
 
 interface RecipeItem {
@@ -26,18 +20,16 @@ interface RecipeItem {
   quantity: number
   unit?: string
   unit_cost?: number
+  total_cost?: number // Added total cost
 }
 
 interface Recipe {
   id?: string
   name: string
   description?: string
-  final_product_id: string
-  final_product_name?: string
-  yield_quantity: number
-  production_cost?: number
-  is_active: boolean
   items: RecipeItem[]
+  total_price?: number // Added total price for the entire recipe
+  is_active: boolean
 }
 
 interface RecipeFormProps {
@@ -53,16 +45,14 @@ export function RecipeForm({
 }: RecipeFormProps) {
   const [loading, setLoading] = useState(false)
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
-  const [finalProducts, setFinalProducts] = useState<FinalProduct[]>([])
   const [error, setError] = useState<string | null>(null)
   
   const [formData, setFormData] = useState<Recipe>({
     name: '',
     description: '',
-    final_product_id: '',
-    yield_quantity: 1,
+    items: [],
     is_active: true,
-    items: []
+    total_price: 0
   })
 
   const supabase = createClientComponentClient()
@@ -71,18 +61,16 @@ export function RecipeForm({
     if (recipe) {
       setFormData({
         ...recipe,
-        // Set empty string to undefined for optional fields
         description: recipe.description || '',
       })
     }
     
     fetchRawMaterials()
-    fetchFinalProducts()
   }, [recipe])
 
   const fetchRawMaterials = async () => {
     try {
-      // Get raw materials with their current inventory levels
+      // Get raw materials with their current inventory levels and prices
       const { data: materialsData, error: materialsError } = await supabase
         .from('raw_materials')
         .select('id, name, unit')
@@ -91,44 +79,28 @@ export function RecipeForm({
       
       if (materialsError) throw materialsError
       
-      // Get inventory data
+      // Get inventory and pricing data
       const { data: inventoryData, error: inventoryError } = await supabase
         .from('inventory')
-        .select('item_id, current_stock')
+        .select('item_id, current_stock, unit_price')
         .eq('item_type', 'raw_material')
       
       if (inventoryError) throw inventoryError
       
       // Combine data
-      const materialsWithInventory = (materialsData || []).map(material => {
+      const materialsWithPricing = (materialsData || []).map(material => {
         const inventory = inventoryData?.find(inv => inv.item_id === material.id)
         return {
           ...material,
-          current_stock: inventory?.current_stock || 0
+          current_stock: inventory?.current_stock || 0,
+          unit_price: inventory?.unit_price || 0
         }
       })
       
-      setRawMaterials(materialsWithInventory)
+      setRawMaterials(materialsWithPricing)
     } catch (error: any) {
       console.error('Error fetching raw materials:', error)
       setError('Failed to load raw materials. Please try again.')
-    }
-  }
-
-  const fetchFinalProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('final_products')
-        .select('id, name, unit')
-        .eq('is_active', true)
-        .order('name')
-      
-      if (error) throw error
-      
-      setFinalProducts(data || [])
-    } catch (error: any) {
-      console.error('Error fetching final products:', error)
-      setError('Failed to load final products. Please try again.')
     }
   }
 
@@ -140,8 +112,6 @@ export function RecipeForm({
     if (type === 'checkbox') {
       const checkboxInput = e.target as HTMLInputElement
       setFormData({ ...formData, [name]: checkboxInput.checked })
-    } else if (type === 'number') {
-      setFormData({ ...formData, [name]: parseFloat(value) || 0 })
     } else {
       setFormData({ ...formData, [name]: value })
     }
@@ -157,7 +127,15 @@ export function RecipeForm({
   const removeRecipeItem = (index: number) => {
     const newItems = [...formData.items]
     newItems.splice(index, 1)
-    setFormData({ ...formData, items: newItems })
+    
+    // Recalculate total price
+    const updatedTotalPrice = calculateTotalPrice(newItems)
+    
+    setFormData({ 
+      ...formData, 
+      items: newItems,
+      total_price: updatedTotalPrice
+    })
   }
 
   const handleItemChange = (index: number, field: string, value: any) => {
@@ -165,146 +143,135 @@ export function RecipeForm({
     
     if (field === 'raw_material_id') {
       const selectedMaterial = rawMaterials.find(material => material.id === value)
+      
+      // Update item with material details
       newItems[index] = {
         ...newItems[index],
         raw_material_id: value,
         raw_material_name: selectedMaterial?.name,
-        unit: selectedMaterial?.unit
+        unit: selectedMaterial?.unit,
+        unit_cost: selectedMaterial?.unit_price || 0
       }
-    } else {
-      newItems[index] = { ...newItems[index], [field]: value }
+    } else if (field === 'quantity') {
+      // Update quantity and calculate total cost
+      newItems[index] = { 
+        ...newItems[index], 
+        [field]: value,
+        total_cost: (newItems[index].unit_cost || 0) * value
+      }
     }
     
-    setFormData({ ...formData, items: newItems })
+    // Recalculate total recipe price
+    const updatedTotalPrice = calculateTotalPrice(newItems)
+    
+    setFormData({ 
+      ...formData, 
+      items: newItems,
+      total_price: updatedTotalPrice
+    })
   }
 
-const calculateTotalCost = () => {
-  // This would normally be calculated based on current raw material prices
-  // For now, we'll return a placeholder value
-  return formData.items.reduce((total, item) => {
-    const material = rawMaterials.find(m => m.id === item.raw_material_id)
-    // In a real app, you'd multiply by the actual unit cost from inventory
-    return total + (item.quantity * (material?.unit_cost || 0))
-  }, 0)
-}
+  const calculateTotalPrice = (items: RecipeItem[]) => {
+    return items.reduce((total, item) => 
+      total + (item.unit_cost || 0) * (item.quantity || 0), 
+      0
+    )
+  }
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError(null);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-  try {
-    // Validate required fields
-    if (!formData.name || !formData.final_product_id) {
-      throw new Error('Recipe name and final product are required fields.');
-    }
+    try {
+      // Validate required fields
+      if (!formData.name) {
+        throw new Error('Recipe name is required.');
+      }
 
-    if (formData.items.length === 0) {
-      throw new Error('Recipe must have at least one ingredient.');
-    }
+      if (formData.items.length === 0) {
+        throw new Error('Recipe must have at least one ingredient.');
+      }
 
-    // Validate each item has a material and quantity
-    const invalidItem = formData.items.find(item => !item.raw_material_id || item.quantity <= 0);
-    if (invalidItem) {
-      throw new Error('All ingredients must have a raw material and a positive quantity.');
-    }
+      // Validate each item has a material and quantity
+      const invalidItem = formData.items.find(item => !item.raw_material_id || item.quantity <= 0);
+      if (invalidItem) {
+        throw new Error('All ingredients must have a raw material and a positive quantity.');
+      }
 
-    if (recipe?.id) {
-      // Update existing recipe
-      // Since we can't use transactions directly, we'll perform operations sequentially
-      
-      // 1. Update recipe
-      const { error: recipeError } = await supabase
-        .from('product_recipes')
-        .update({
-          name: formData.name,
-          description: formData.description || null,
-          final_product_id: formData.final_product_id,
-          yield_quantity: formData.yield_quantity,
-          is_active: formData.is_active
-        })
-        .eq('id', recipe.id);
-      
-      if (recipeError) throw recipeError;
-      
-      // 2. Delete existing recipe items
-      const { error: deleteError } = await supabase
-        .from('recipe_items')
-        .delete()
-        .eq('recipe_id', recipe.id);
-      
-      if (deleteError) throw deleteError;
-      
-      // 3. Insert new recipe items
-      const recipeItems = formData.items.map(item => ({
-        recipe_id: recipe.id,
-        raw_material_id: item.raw_material_id,
-        quantity: item.quantity
-      }));
-      
-      const { error: itemsError } = await supabase
-        .from('recipe_items')
-        .insert(recipeItems);
-      
-      if (itemsError) throw itemsError;
-    } else {
-      // Insert new recipe
-      const { data: recipeData, error: recipeError } = await supabase
-        .from('product_recipes')
-        .insert({
-          name: formData.name,
-          description: formData.description || null,
-          final_product_id: formData.final_product_id,
-          yield_quantity: formData.yield_quantity,
-          is_active: formData.is_active
-        })
-        .select();
-      
-      if (recipeError) throw recipeError;
-      
-      // Insert recipe items
-      if (recipeData && recipeData.length > 0) {
-        const recipeId = recipeData[0].id;
+      // Prepare recipe data
+      const recipeData = {
+        name: formData.name,
+        description: formData.description || null,
+        is_active: formData.is_active,
+        total_price: formData.total_price
+      }
+
+      let savedRecipeId
+
+      if (recipe?.id) {
+        // Update existing recipe
+        const { data: updatedRecipe, error: updateError } = await supabase
+          .from('product_recipes')
+          .update(recipeData)
+          .eq('id', recipe.id)
+          .select()
         
+        if (updateError) throw updateError
+        
+        savedRecipeId = recipe.id
+        
+        // Delete existing recipe items
+        const { error: deleteError } = await supabase
+          .from('recipe_items')
+          .delete()
+          .eq('recipe_id', recipe.id)
+        
+        if (deleteError) throw deleteError
+      } else {
+        // Insert new recipe
+        const { data: newRecipe, error: insertError } = await supabase
+          .from('product_recipes')
+          .insert(recipeData)
+          .select()
+        
+        if (insertError) throw insertError
+        
+        savedRecipeId = newRecipe[0].id
+      }
+
+      // Insert or update recipe items
+      if (savedRecipeId) {
         const recipeItems = formData.items.map(item => ({
-          recipe_id: recipeId,
+          recipe_id: savedRecipeId,
           raw_material_id: item.raw_material_id,
-          quantity: item.quantity
-        }));
+          quantity: item.quantity,
+          unit_cost: item.unit_cost,
+          total_cost: item.total_cost
+        }))
         
         const { error: itemsError } = await supabase
           .from('recipe_items')
-          .insert(recipeItems);
+          .insert(recipeItems)
         
-        if (itemsError) throw itemsError;
+        if (itemsError) throw itemsError
       }
+
+      // Call the onSubmit callback
+      onSubmit()
+    } catch (error: any) {
+      console.error('Error saving recipe:', error)
+      setError(error.message || 'Failed to save recipe. Please try again.')
+      setLoading(false)
     }
-
-    // Also update the final product to mark it as recipe-based
-    const { error: updateProductError } = await supabase
-      .from('final_products')
-      .update({ is_recipe_based: true })
-      .eq('id', formData.final_product_id);
-    
-    if (updateProductError) throw updateProductError;
-
-    // Call the onSubmit callback (usually refreshes the list)
-    onSubmit();
-  } catch (error: any) {
-    console.error('Error saving recipe:', error);
-    setError(error.message || 'Failed to save recipe. Please try again.');
-    setLoading(false);
   }
-}
-
-  const selectedProductUnit = finalProducts.find(p => p.id === formData.final_product_id)?.unit || 'unit';
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
         {/* Error Notification */}
         {error && (
-          <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative mb-4" role="alert">
             <span className="block sm:inline">{error}</span>
             <span 
               className="absolute top-0 bottom-0 right-0 px-4 py-3"
@@ -319,7 +286,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         )}
 
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {recipe ? 'Edit Recipe' : 'Create New Recipe'}
           </h3>
           <button 
@@ -334,7 +301,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           {/* Recipe Details */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Recipe Name
               </label>
               <input
@@ -342,49 +309,13 @@ const handleSubmit = async (e: React.FormEvent) => {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Final Product
-              </label>
-              <select
-                name="final_product_id"
-                value={formData.final_product_id}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                required
-              >
-                <option value="">Select a product</option>
-                {finalProducts.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} ({product.unit})
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Yield Quantity (number of {selectedProductUnit}s produced)
-              </label>
-              <input
-                type="number"
-                name="yield_quantity"
-                value={formData.yield_quantity}
-                onChange={handleChange}
-                min="1"
-                step="1"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Description
               </label>
               <textarea
@@ -392,19 +323,19 @@ const handleSubmit = async (e: React.FormEvent) => {
                 value={formData.description}
                 onChange={handleChange}
                 rows={2}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               />
             </div>
           </div>
 
           {/* Recipe Ingredients */}
-          <div className="pt-4 border-t">
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-base font-medium text-gray-900">Recipe Ingredients</h4>
+              <h4 className="text-base font-medium text-gray-900 dark:text-white">Recipe Ingredients</h4>
               <button
                 type="button"
                 onClick={addRecipeItem}
-                className="inline-flex items-center rounded border border-transparent bg-indigo-100 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                className="inline-flex items-center rounded border border-transparent bg-indigo-100 dark:bg-indigo-900 px-2.5 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Ingredient
@@ -412,33 +343,33 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
 
             {formData.items.length === 0 ? (
-              <div className="text-center py-4 text-sm text-gray-500 bg-gray-50 rounded-md">
+              <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded-md">
                 No ingredients added yet. Add raw materials to your recipe.
               </div>
             ) : (
               <div className="space-y-3">
                 {formData.items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-4 items-end border-b pb-3">
-                    <div className="col-span-6">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <div key={index} className="grid grid-cols-12 gap-4 items-end border-b dark:border-gray-700 pb-3">
+                    <div className="col-span-4">
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Raw Material
                       </label>
                       <select
                         value={item.raw_material_id}
                         onChange={(e) => handleItemChange(index, 'raw_material_id', e.target.value)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         required
                       >
                         <option value="">Select material</option>
                         {rawMaterials.map((material) => (
                           <option key={material.id} value={material.id}>
-                            {material.name} ({material.unit}) - {material.current_stock} in stock
+                            {material.name} ({material.unit}) - £{material.unit_price?.toFixed(2)}
                           </option>
                         ))}
                       </select>
                     </div>
-                    <div className="col-span-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Quantity
                       </label>
                       <input
@@ -447,23 +378,31 @@ const handleSubmit = async (e: React.FormEvent) => {
                         step="0.001"
                         value={item.quantity}
                         onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         required
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Unit
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Unit Price
                       </label>
-                      <div className="block w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-                        {item.unit || '-'}
+                      <div className="block w-full rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                        £{item.unit_cost?.toFixed(2) || '0.00'}
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Total Cost
+                      </label>
+                      <div className="block w-full rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                        £{item.total_cost?.toFixed(2) || '0.00'}
                       </div>
                     </div>
                     <div className="col-span-1 flex justify-end">
                       <button
                         type="button"
                         onClick={() => removeRecipeItem(index)}
-                        className="text-red-500 hover:text-red-700 p-2"
+                        className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 p-2"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -474,6 +413,19 @@ const handleSubmit = async (e: React.FormEvent) => {
             )}
           </div>
 
+          {/* Total Price Section */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <h4 className="text-base font-medium text-gray-900 dark:text-white">Total Recipe Cost</h4>
+              <div className="text-lg font-medium text-gray-900 dark:text-white">
+                £{formData.total_price?.toFixed(2) || '0.00'}
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              This is the calculated cost based on the current prices of ingredients.
+            </p>
+          </div>
+
           <div className="flex items-start">
             <div className="flex h-5 items-center">
               <input
@@ -482,14 +434,14 @@ const handleSubmit = async (e: React.FormEvent) => {
                 type="checkbox"
                 checked={formData.is_active}
                 onChange={handleChange}
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
               />
             </div>
             <div className="ml-3 text-sm">
-              <label htmlFor="is_active" className="font-medium text-gray-700">
+              <label htmlFor="is_active" className="font-medium text-gray-700 dark:text-gray-300">
                 Active
               </label>
-              <p className="text-gray-500">Inactive recipes won't be available for production</p>
+              <p className="text-gray-500 dark:text-gray-400">Inactive recipes won't be available for production</p>
             </div>
           </div>
 
@@ -497,7 +449,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              className="rounded-md bg-white dark:bg-gray-700 px-3.5 py-2.5 text-sm font-semibold text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
               disabled={loading}
             >
               Cancel
