@@ -2,12 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Search 
-} from 'lucide-react'
+import { Plus, Edit2, Trash2, Search } from 'lucide-react'
 
 // Supplier interface to match database schema
 interface Supplier {
@@ -68,29 +63,53 @@ export default function ManageSuppliersPage() {
 
   const handleAddSupplier = async (supplierData: Supplier) => {
     try {
-      let result
+      // Validate required fields
+      if (!supplierData.name || !supplierData.contact_name || !supplierData.email) {
+        throw new Error('Name, contact name, and email are required fields.')
+      }
+
+      // Ensure products is always an array
+      if (!Array.isArray(supplierData.products)) {
+        supplierData.products = []
+      }
+
+      let result;
       if (editingSupplier?.id) {
-        // Update existing supplier
+        // Update existing supplier with specific fields
         result = await supabase
           .from('suppliers')
-          .update(supplierData)
+          .update({
+            name: supplierData.name,
+            contact_name: supplierData.contact_name,
+            email: supplierData.email,
+            phone: supplierData.phone,
+            address: supplierData.address,
+            products: supplierData.products,
+            is_approved: supplierData.is_approved
+          })
           .eq('id', editingSupplier.id)
       } else {
         // Insert new supplier
         result = await supabase
           .from('suppliers')
-          .insert(supplierData)
+          .insert({
+            name: supplierData.name,
+            contact_name: supplierData.contact_name,
+            email: supplierData.email,
+            phone: supplierData.phone,
+            address: supplierData.address,
+            products: supplierData.products,
+            is_approved: supplierData.is_approved
+          })
       }
 
       if (result.error) throw result.error
 
-      // Refresh suppliers list
+      // Refresh suppliers list and close the form
       fetchSuppliers()
-      
-      // Close form
       setShowForm(false)
       setEditingSupplier(null)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving supplier:', error)
       alert('Failed to save supplier. Please try again.')
     }
@@ -106,7 +125,6 @@ export default function ManageSuppliersPage() {
         
         if (error) throw error
         
-        // Refresh suppliers list
         fetchSuppliers()
       } catch (error) {
         console.error('Error deleting supplier:', error)
@@ -273,15 +291,30 @@ function SupplierFormModal({ supplier, onClose, onSubmit }: SupplierFormModalPro
     is_approved: supplier?.is_approved ?? false
   })
 
-  // State for managing product input
+  // State for managing product input and form errors
   const [newProduct, setNewProduct] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({
-      ...formData,
-      id: supplier?.id
-    })
+
+    try {
+      // Ensure required fields are filled
+      if (!formData.name || !formData.contact_name || !formData.email) {
+        throw new Error('Name, contact name, and email are required fields')
+      }
+
+      // Ensure products is always an array
+      const submitData = {
+        ...formData,
+        products: formData.products || [],
+        id: supplier?.id
+      }
+
+      onSubmit(submitData)
+    } catch (err: any) {
+      setError(err.message || 'Failed to save supplier. Please try again.')
+    }
   }
 
   const addProduct = () => {
@@ -307,6 +340,11 @@ function SupplierFormModal({ supplier, onClose, onSubmit }: SupplierFormModalPro
         <h3 className="text-lg font-semibold mb-4">
           {supplier ? 'Edit Supplier' : 'Add New Supplier'}
         </h3>
+        {error && (
+          <p className="mb-4 text-sm text-red-600">
+            {error}
+          </p>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -353,7 +391,6 @@ function SupplierFormModal({ supplier, onClose, onSubmit }: SupplierFormModalPro
               value={formData.phone}
               onChange={(e) => setFormData({...formData, phone: e.target.value})}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-              required
             />
           </div>
           <div>
