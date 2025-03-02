@@ -55,7 +55,7 @@ const navigation: NavItem[] = [
     ]
   },
   { name: 'Sales', href: '/dashboard/sales', icon: ShoppingCart },
-  { name: 'Stock Receiving', href: '/dashboard/stock/receive', icon: PackageOpen },
+  { name: 'Stock In', href: '/dashboard/stock/receive', icon: PackageOpen },
   { 
     name: 'Traceability & Compliance', 
     icon: FileText,
