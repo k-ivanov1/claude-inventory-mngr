@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { X } from 'lucide-react'
+import { X, Plus } from 'lucide-react'
 import { TeaCoffeeStock } from '@/lib/types/stock'
 
 interface TeaCoffeeFormProps {
@@ -15,6 +15,9 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
   const [loading, setLoading] = useState(false)
   const supabase = createClientComponentClient()
   
+  // Add state for approved suppliers
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
+
   const [formData, setFormData] = useState<TeaCoffeeStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
@@ -32,24 +35,42 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
     checked_by: '',
   })
 
+  // Function to fetch approved suppliers
+  const fetchSuppliers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name')
+        .eq('is_approved', true)
+        .order('name')
+      
+      if (error) throw error
+      
+      setSuppliers(data || [])
+    } catch (error) {
+      console.error('Error fetching suppliers:', error)
+    }
+  }
+
   useEffect(() => {
     if (editItem) {
       setFormData(editItem)
     }
+    fetchSuppliers()
   }, [editItem])
 
   // Calculate derived values
   const totalKg = formData.quantity * (formData.package_size / 1000)
-  const pricePerKg = formData.package_size > 0 
-    ? formData.price_per_unit / (formData.package_size / 1000) 
-    : 0
+  const pricePerKg =
+    formData.package_size > 0
+      ? formData.price_per_unit / (formData.package_size / 1000)
+      : 0
   const totalCost = formData.quantity * formData.price_per_unit
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target
-    
     if (type === 'checkbox') {
       const checkboxInput = e.target as HTMLInputElement
       setFormData({ ...formData, [name]: checkboxInput.checked })
@@ -63,7 +84,6 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-
     try {
       const dataToSubmit = {
         ...formData,
@@ -71,29 +91,22 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
         price_per_kg: pricePerKg,
         total_cost: totalCost,
       }
-
       let result
-
       if (editItem?.id) {
-        // Update existing item
         result = await supabase
           .from('stock_tea_coffee')
           .update(dataToSubmit)
           .eq('id', editItem.id)
       } else {
-        // Insert new item
         result = await supabase
           .from('stock_tea_coffee')
           .insert(dataToSubmit)
       }
-
       if (result.error) {
         throw result.error
       }
-
       // Also update inventory table
       await updateInventory(dataToSubmit)
-
       if (onSuccess) {
         onSuccess()
       }
@@ -107,7 +120,6 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
   }
 
   const updateInventory = async (stockItem: TeaCoffeeStock) => {
-    // First check if the product exists in inventory
     const { data: existingItem } = await supabase
       .from('inventory')
       .select('*')
@@ -116,37 +128,31 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
       .single()
 
     const stockValue = stockItem.quantity
-    
     if (existingItem) {
-      // If exists, update quantity
-      // If editing, we need to adjust the stock change
       let quantityAdjustment = stockValue
-      
       if (editItem?.id) {
         quantityAdjustment = stockValue - editItem.quantity
       }
-      
       await supabase
         .from('inventory')
         .update({
           stock_level: existingItem.stock_level + quantityAdjustment,
-          unit_price: stockItem.price_per_unit, // Update to most recent price
+          unit_price: stockItem.price_per_unit,
           last_updated: new Date().toISOString(),
         })
         .eq('id', existingItem.id)
     } else {
-      // If doesn't exist, create new inventory item
       await supabase
         .from('inventory')
         .insert({
           product_name: stockItem.product_name,
           product_type: stockItem.type,
-          category: stockItem.type, // Use type as category
+          category: stockItem.type,
           supplier: stockItem.supplier,
           stock_level: stockValue,
           unit_price: stockItem.price_per_unit,
-          reorder_point: 5, // Default reorder point
-          sku: `${stockItem.type.substring(0, 3)}-${Date.now()}`, // Generate a simple SKU
+          reorder_point: 5,
+          sku: `${stockItem.type.substring(0, 3)}-${Date.now()}`,
         })
     }
   }
@@ -158,16 +164,14 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
           <h3 className="text-lg font-semibold">
             {editItem ? 'Edit Tea/Coffee Stock' : 'Receive Tea/Coffee Stock'}
           </h3>
-          <button 
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-500"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Date Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Date
@@ -182,6 +186,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
               />
             </div>
 
+            {/* Type Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Type
@@ -198,6 +203,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
               </select>
             </div>
 
+            {/* Product Name Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Product Name
@@ -212,20 +218,38 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
               />
             </div>
 
+            {/* Supplier Field as Dropdown */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Supplier
               </label>
-              <input
-                type="text"
-                name="supplier"
-                value={formData.supplier}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                required
-              />
+              <div className="flex items-center gap-2">
+                <select
+                  name="supplier"
+                  value={formData.supplier}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  required
+                >
+                  <option value="">Select a supplier</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.name}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => window.open('/dashboard/suppliers', '_blank')}
+                  className="rounded-md bg-indigo-100 dark:bg-indigo-900 px-2 py-2 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800"
+                  title="Add new supplier"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
+            {/* Invoice Number Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Invoice Number
@@ -240,6 +264,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
               />
             </div>
 
+            {/* Batch Number Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Batch Number
@@ -254,6 +279,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
               />
             </div>
 
+            {/* Best Before Date Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Best Before Date
@@ -268,6 +294,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
               />
             </div>
 
+            {/* Quantity Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Quantity (Units)
@@ -284,6 +311,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
               />
             </div>
 
+            {/* Package Size Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Package Size (grams)
@@ -300,6 +328,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
               />
             </div>
 
+            {/* Price per Unit Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Price per Unit (£)
@@ -316,6 +345,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
               />
             </div>
 
+            {/* Checked By Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Checked By
@@ -331,7 +361,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
             </div>
           </div>
 
-          {/* Calculated fields */}
+          {/* Calculated Fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t">
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -341,7 +371,6 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
                 {totalKg.toFixed(2)} kg
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Price per kg (£)
@@ -350,7 +379,6 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
                 £{pricePerKg.toFixed(2)}
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Total Purchase Cost (£)
@@ -361,7 +389,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
             </div>
           </div>
 
-          {/* Quality checks */}
+          {/* Quality Checks */}
           <div className="space-y-4 pt-4 border-t">
             <div className="flex items-start">
               <div className="flex h-5 items-center">
@@ -380,7 +408,6 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
                 </label>
               </div>
             </div>
-
             <div className="flex items-start">
               <div className="flex h-5 items-center">
                 <input
@@ -393,12 +420,14 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
                 />
               </div>
               <div className="ml-3 text-sm">
-                <label htmlFor="labelling_matches_specifications" className="font-medium text-gray-700">
+                <label
+                  htmlFor="labelling_matches_specifications"
+                  className="font-medium text-gray-700"
+                >
                   Labelling matches specifications
                 </label>
               </div>
             </div>
-
             <div className="flex items-start">
               <div className="flex h-5 items-center">
                 <input
@@ -418,6 +447,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: TeaCoffee
             </div>
           </div>
 
+          {/* Form Actions */}
           <div className="flex justify-end gap-x-3">
             <button
               type="button"
