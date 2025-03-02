@@ -271,6 +271,8 @@ export default function VersionsPage() {
                     </tr>
                     {expandedDocId === doc.id && (
                       <tr>
+                        {expandedDocId === doc.id && (
+                      <tr>
                         <td colSpan={5} className="px-0 py-0">
                           <div className="bg-gray-50 dark:bg-gray-900 p-4 border-t border-b border-gray-200 dark:border-gray-700">
                             <div className="mb-2 flex items-center">
