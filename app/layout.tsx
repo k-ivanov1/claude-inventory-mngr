@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/contexts/theme-context'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Tea Inventory Dashboard',
+  title: 'Muave Inventory Dashboard',
   description: 'Internal inventory management system for Muave',
 }
 
