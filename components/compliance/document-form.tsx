@@ -1,5 +1,3 @@
-// components/compliance/document-form.tsx
-
 'use client'
 
 import { useState, useEffect } from 'react'
