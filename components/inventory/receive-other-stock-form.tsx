@@ -1,5 +1,3 @@
-'use client'
-
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { X, Plus } from 'lucide-react'
@@ -11,6 +9,11 @@ interface OtherStockFormProps {
   editItem?: OtherStock
 }
 
+// First, let's extend the OtherStock interface to include the missing property
+interface ExtendedOtherStock extends OtherStock {
+  labelling_matches_specifications?: boolean;
+}
+
 export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherStockFormProps) {
   const [loading, setLoading] = useState(false)
   const supabase = createClientComponentClient()
@@ -20,7 +23,8 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
   // State for product types
   const [productTypes, setProductTypes] = useState<string[]>([])
 
-  const [formData, setFormData] = useState<OtherStock>({
+  // Changed the type to ExtendedOtherStock to include the missing property
+  const [formData, setFormData] = useState<ExtendedOtherStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
     type: '', // Using the correct property name from the interface
@@ -34,6 +38,7 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
     is_damaged: false,
     is_accepted: true,
     checked_by: '',
+    labelling_matches_specifications: true,  // Added with default value
     // Other StockBaseFields properties like id and created_at are optional
   })
 
@@ -72,7 +77,13 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
 
   useEffect(() => {
     if (editItem) {
-      setFormData(editItem)
+      // Create a new object that extends editItem with the missing property if needed
+      const extendedItem: ExtendedOtherStock = {
+        ...editItem,
+        labelling_matches_specifications: (editItem as any).labelling_matches_specifications ?? true
+      };
+      
+      setFormData(extendedItem)
     }
     fetchSuppliers()
     fetchProductTypes()
@@ -96,10 +107,10 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
     e.preventDefault()
     setLoading(true)
     try {
-      const dataToSubmit = {
-        ...formData,
-        // Add any calculated fields here if needed
-      }
+      // Create a copy of formData without the extra property for database submission
+      const { labelling_matches_specifications, ...dataToSubmit } = formData;
+      
+      // Add any calculated fields here if needed
       let result
       if (editItem?.id) {
         result = await supabase
