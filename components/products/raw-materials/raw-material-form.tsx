@@ -56,8 +56,8 @@ export function RawMaterialForm({
   useEffect(() => {
     if (material) {
       // Convert old single supplier_id to array if needed
-      const supplierIds = material.supplier_ids || 
-                         (material.supplier_id ? [material.supplier_id] : [])
+    const supplierIds = material.supplier_ids || []
+
       
       setFormData({
         ...material,
