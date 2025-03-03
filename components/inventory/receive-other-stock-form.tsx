@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { X, Plus } from 'lucide-react'
+import { X } from 'lucide-react'
 import { OtherStock } from '@/lib/types/stock'
 
 interface RawMaterial {
@@ -10,6 +10,7 @@ interface RawMaterial {
   name: string
   unit: string
   category: string
+  stock_level?: number
 }
 
 interface OtherStockFormProps {
@@ -18,34 +19,38 @@ interface OtherStockFormProps {
   editItem?: OtherStock
 }
 
-export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherStockFormProps) {
-  const [loading, setLoading] = useState(false)
+export function ReceiveOtherStockForm({ 
+  onClose, 
+  onSuccess, 
+  editItem 
+}: OtherStockFormProps) {
   const supabase = createClientComponentClient()
-
-  // State for raw materials, search, and selected raw material ID
+  
+  // Loading state for the form submission
+  const [loading, setLoading] = useState(false)
+  
+  // Raw materials & selected raw material
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
   const [selectedRawMaterialId, setSelectedRawMaterialId] = useState<string>('')
 
-  // State for approved suppliers
+  // Approved suppliers
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
 
-  // State for product types
+  // Product types
   const [productTypes, setProductTypes] = useState<string[]>([])
 
-  // Note: Although OtherStock type includes batch_number and package_size,
-  // these fields are not needed in the UI. We set them to default values.
+  // Form data (batch_number & package_size removed from UI but defaulted in submission)
   const [formData, setFormData] = useState<OtherStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
     type: '', 
     supplier: '',
     invoice_number: '',
-    batch_number: '', // will be overridden as ""
+    batch_number: '', // Not displayed, default to empty
     best_before_date: '',
     quantity: 0,
     price_per_unit: 0,
-    package_size: 0,  // will be overridden as 0
+    package_size: 0,  // Not displayed, default to 0
     is_damaged: false,
     is_accepted: true,
     checked_by: '',
@@ -54,28 +59,29 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
 
   useEffect(() => {
     if (editItem) {
+      // If editing, populate form
       setFormData({
         ...editItem,
         labelling_matches_specifications: editItem.labelling_matches_specifications ?? true
       })
     }
+    // Fetch data for the dropdowns
     fetchRawMaterials()
     fetchSuppliers()
     fetchProductTypes()
   }, [editItem])
 
+  // Fetch raw materials (exclude tea/coffee if desired)
   const fetchRawMaterials = async () => {
     try {
-      // Fetch raw materials excluding tea and coffee
       const { data, error } = await supabase
         .from('raw_materials')
         .select('id, name, unit, category, stock_level')
-        .not('category', 'in', '(tea,coffee)')
         .eq('is_active', true)
+        // .not('category', 'in', '(tea,coffee)') // <--- Uncomment if you want to exclude tea/coffee
         .order('name')
-      
+
       if (error) throw error
-      
       setRawMaterials(data || [])
     } catch (error: any) {
       console.error('Error fetching raw materials:', error)
@@ -92,7 +98,6 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
         .order('name')
       
       if (error) throw error
-      
       setSuppliers(data || [])
     } catch (error) {
       console.error('Error fetching suppliers:', error)
@@ -107,7 +112,6 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
         .order('type')
       
       if (error) throw error
-      
       setProductTypes(data ? data.map((item: { type: string }) => item.type) : [])
     } catch (error) {
       console.error('Error fetching product types:', error)
@@ -116,65 +120,82 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
     }
   }
 
+  // Common input change handler
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target
+    
     if (type === 'checkbox') {
-      const checkboxInput = e.target as HTMLInputElement
-      setFormData({ ...formData, [name]: checkboxInput.checked })
+      setFormData(prev => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }))
     } else if (type === 'number') {
-      setFormData({ ...formData, [name]: parseFloat(value) || 0 })
+      setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 }))
     } else {
-      setFormData({ ...formData, [name]: value })
+      setFormData(prev => ({ ...prev, [name]: value }))
     }
   }
 
-  // Filter raw materials based on search term
-  const filteredRawMaterials = rawMaterials.filter(material => 
-    material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    material.category.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Update the raw material stock after receiving items
+  const updateRawMaterial = async (rawMaterialId: string, quantity: number) => {
+    try {
+      const { data: rawMaterial, error } = await supabase
+        .from('raw_materials')
+        .select('stock_level')
+        .eq('id', rawMaterialId)
+        .single()
+      if (error) throw error
+      
+      const newStockLevel = (rawMaterial?.stock_level || 0) + quantity
+      const { error: updateError } = await supabase
+        .from('raw_materials')
+        .update({ stock_level: newStockLevel })
+        .eq('id', rawMaterialId)
+      if (updateError) throw updateError
+    } catch (error) {
+      console.error('Error updating raw material:', error)
+    }
+  }
 
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
     try {
-      // Override batch_number and package_size as these fields are not required
+      // Force batch_number = "" and package_size = 0
       const dataToSubmit = {
         ...formData,
-        batch_number: "",
+        batch_number: '',
         package_size: 0,
         total_cost: formData.quantity * formData.price_per_unit
       }
       
       let result
       if (editItem?.id) {
+        // Update existing
         result = await supabase
           .from('stock_other')
           .update(dataToSubmit)
           .eq('id', editItem.id)
       } else {
+        // Insert new
         result = await supabase
           .from('stock_other')
           .insert(dataToSubmit)
       }
       
-      if (result.error) {
-        throw result.error
-      }
+      if (result.error) throw result.error
       
-      // Update inventory table if applicable
+      // Update inventory
       await updateInventory(dataToSubmit)
 
-      // Update raw material's stock level if a raw material was selected
+      // If a raw material was selected, update its stock
       if (selectedRawMaterialId) {
         await updateRawMaterial(selectedRawMaterialId, formData.quantity)
       }
       
-      if (onSuccess) {
-        onSuccess()
-      }
+      // Done
+      if (onSuccess) onSuccess()
       onClose()
     } catch (error: any) {
       console.error('Error saving other stock:', error)
@@ -184,6 +205,7 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
     }
   }
 
+  // Update or insert into inventory
   const updateInventory = async (stockItem: OtherStock) => {
     const { data: existingItem } = await supabase
       .from('inventory')
@@ -222,25 +244,6 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
     }
   }
 
-  const updateRawMaterial = async (rawMaterialId: string, quantity: number) => {
-    try {
-      const { data: rawMaterial, error } = await supabase
-         .from('raw_materials')
-         .select('stock_level')
-         .eq('id', rawMaterialId)
-         .single();
-      if (error) throw error;
-      const newStockLevel = (rawMaterial.stock_level || 0) + quantity;
-      const { error: updateError } = await supabase
-         .from('raw_materials')
-         .update({ stock_level: newStockLevel })
-         .eq('id', rawMaterialId);
-      if (updateError) throw updateError;
-    } catch (error) {
-      console.error("Error updating raw material", error);
-    }
-  }
-
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full p-6">
@@ -265,7 +268,9 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 name="date"
                 value={formData.date}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
+                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -279,7 +284,9 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 name="type"
                 value={formData.type}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
+                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               >
                 <option value="">Select a product type</option>
@@ -291,52 +298,37 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
               </select>
             </div>
 
-            {/* Raw Material Selection Field */}
+            {/* Raw Material Dropdown */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Raw Material
               </label>
-              <div className="mt-1 relative">
-                <input
-                  type="text"
-                  placeholder="Search raw materials..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-                {searchTerm && (
-                  <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {filteredRawMaterials.length > 0 ? (
-                      filteredRawMaterials.map((material) => (
-                        <div 
-                          key={material.id} 
-                          onClick={() => {
-                            setFormData({
-                              ...formData, 
-                              product_name: material.name,
-                              type: material.category
-                            });
-                            setSelectedRawMaterialId(material.id);
-                            setSearchTerm('');
-                          }}
-                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                        >
-                          {material.name} ({material.category}) - {material.unit}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-2 text-gray-500 dark:text-gray-400">
-                        No raw materials found
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              {formData.product_name && (
-                <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  Selected: {formData.product_name}
-                </div>
-              )}
+              <select
+                name="raw_material_id"
+                value={selectedRawMaterialId}
+                onChange={(e) => {
+                  const matId = e.target.value
+                  setSelectedRawMaterialId(matId)
+                  const selectedMaterial = rawMaterials.find(m => m.id === matId)
+                  if (selectedMaterial) {
+                    setFormData(prev => ({
+                      ...prev,
+                      product_name: selectedMaterial.name,
+                      type: selectedMaterial.category
+                    }))
+                  }
+                }}
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
+                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              >
+                <option value="">Select a raw material</option>
+                {rawMaterials.map((material) => (
+                  <option key={material.id} value={material.id}>
+                    {material.name} ({material.category}) - {material.unit}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Supplier Field */}
@@ -348,7 +340,9 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 name="supplier"
                 value={formData.supplier}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
+                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               >
                 <option value="">Select a supplier</option>
@@ -370,7 +364,9 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 name="invoice_number"
                 value={formData.invoice_number}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
+                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -385,7 +381,9 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 name="best_before_date"
                 value={formData.best_before_date}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
+                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -402,7 +400,9 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 onChange={handleChange}
                 min="0"
                 step="1"
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
+                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -419,7 +419,9 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 onChange={handleChange}
                 min="0"
                 step="0.01"
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
+                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -434,7 +436,9 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
                 name="checked_by"
                 value={formData.checked_by}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
+                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -506,7 +510,8 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Total Quantity
               </label>
-              <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 py-2 shadow-sm sm:text-sm text-gray-900 dark:text-gray-100">
+              <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
+                bg-gray-50 dark:bg-gray-700 px-3 py-2 shadow-sm sm:text-sm text-gray-900 dark:text-gray-100">
                 {formData.quantity} units
               </div>
             </div>
@@ -514,7 +519,8 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Unit Price
               </label>
-              <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 py-2 shadow-sm sm:text-sm text-gray-900 dark:text-gray-100">
+              <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
+                bg-gray-50 dark:bg-gray-700 px-3 py-2 shadow-sm sm:text-sm text-gray-900 dark:text-gray-100">
                 £{formData.price_per_unit.toFixed(2)}
               </div>
             </div>
@@ -522,7 +528,8 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Total Purchase Cost
               </label>
-              <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 py-2 shadow-sm sm:text-sm text-gray-900 dark:text-gray-100">
+              <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 
+                bg-gray-50 dark:bg-gray-700 px-3 py-2 shadow-sm sm:text-sm text-gray-900 dark:text-gray-100">
                 £{(formData.quantity * formData.price_per_unit).toFixed(2)}
               </div>
             </div>
@@ -533,14 +540,17 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherSto
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md bg-white dark:bg-gray-700 px-3.5 py-2.5 text-sm font-semibold text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
+              className="rounded-md bg-white dark:bg-gray-700 px-3.5 py-2.5 text-sm font-semibold 
+                text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 
+                dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+              className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold 
+                text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
               disabled={loading}
             >
               {loading ? 'Saving...' : editItem ? 'Update Stock' : 'Add Stock'}
