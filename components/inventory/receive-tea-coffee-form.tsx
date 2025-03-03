@@ -210,47 +210,52 @@ export function ReceiveTeaCoffeeForm({
   }
 
   const handleEditType = async () => {
-    if (!editingTypeName.trim() || !editingTypeId) {
-      setError('Type name cannot be empty')
-      return
-    }
-
-    if (productTypes.some(type => 
-      type.id !== editingTypeId && 
-      type.name.toLowerCase() === editingTypeName.toLowerCase()
-    )) {
-      setError('This type name already exists')
-      return
-    }
-
-const newType = editingTypeName.trim();
-if (newType !== "tea" && newType !== "coffee") {
-  setError('Invalid type. Allowed values are "tea" or "coffee".');
-  return;
-}
-try {
-  // Save the old type for comparison
-  const oldType = productTypes.find(t => t.id === editingTypeId)?.name;
-  
-  const { error } = await supabase
-    .from('product_types')
-    .update({ name: newType })
-    .eq('id', editingTypeId);
-  
-  if (error) throw error;
-  
-  await fetchProductTypes();
-  
-  setEditingTypeId(null);
-  setEditingTypeName('');
-  setSuccess('Type updated successfully');
-  
-  if (formData.type === oldType) {
-    setFormData(prev => ({ ...prev, type: newType }));
+  if (!editingTypeName.trim() || !editingTypeId) {
+    setError('Type name cannot be empty');
+    return;
   }
-} catch (error: any) {
-  console.error('Error updating product type:', error);
-  setError('Failed to update product type: ' + error.message);
+
+  if (
+    productTypes.some(
+      (type) =>
+        type.id !== editingTypeId &&
+        type.name.toLowerCase() === editingTypeName.toLowerCase()
+    )
+  ) {
+    setError('This type name already exists');
+    return;
+  }
+
+  const newType = editingTypeName.trim();
+  if (newType !== "tea" && newType !== "coffee") {
+    setError('Invalid type. Allowed values are "tea" or "coffee".');
+    return;
+  }
+
+  try {
+    // Save the old type for comparison
+    const oldType = productTypes.find(t => t.id === editingTypeId)?.name;
+    
+    const { error } = await supabase
+      .from('product_types')
+      .update({ name: newType })
+      .eq('id', editingTypeId);
+    
+    if (error) throw error;
+    
+    await fetchProductTypes();
+    
+    setEditingTypeId(null);
+    setEditingTypeName('');
+    setSuccess('Type updated successfully');
+    
+    if (formData.type === oldType) {
+      setFormData(prev => ({ ...prev, type: newType as "tea" | "coffee" }));
+    }
+  } catch (error: any) {
+    console.error('Error updating product type:', error);
+    setError('Failed to update product type: ' + error.message);
+  }
 };
 
   const handleDeleteType = async (typeId: string) => {
