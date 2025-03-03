@@ -161,48 +161,54 @@ export function ReceiveOtherStockForm({
     e.preventDefault()
     setLoading(true)
 
-    try {
-      // Force batch_number = "" and package_size = 0
-      const dataToSubmit = {
-        ...formData,
-        package_size: 0,
-        total_cost: formData.quantity * formData.price_per_unit
-      }
-      
-      let result
-      if (editItem?.id) {
-        // Update existing
-        result = await supabase
-          .from('stock_other')
-          .update(dataToSubmit)
-          .eq('id', editItem.id)
-      } else {
-        // Insert new
-        result = await supabase
-          .from('stock_other')
-          .insert(dataToSubmit)
-      }
-      
-      if (result.error) throw result.error
-      
-      // Update inventory
-      await updateInventory(dataToSubmit)
+try {
+  // Build a payload with only the existing columns
+  const dataToSubmit = {
+    date: formData.date,
+    product_name: formData.product_name,
+    type: formData.type,
+    supplier: formData.supplier,
+    invoice_number: formData.invoice_number,
+    quantity: formData.quantity,
+    price_per_unit: formData.price_per_unit,
+    is_damaged: formData.is_damaged,
+    is_accepted: formData.is_accepted,
+    checked_by: formData.checked_by,
+    total_cost: formData.quantity * formData.price_per_unit,
+  };
 
-      // If a raw material was selected, update its stock
-      if (selectedRawMaterialId) {
-        await updateRawMaterial(selectedRawMaterialId, formData.quantity)
-      }
-      
-      // Done
-      if (onSuccess) onSuccess()
-      onClose()
-    } catch (error: any) {
-      console.error('Error saving other stock:', error)
-      alert('Failed to save stock item. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+  let result;
+  if (editItem?.id) {
+    // Update existing stock item
+    result = await supabase
+      .from('stock_other')
+      .update(dataToSubmit)
+      .eq('id', editItem.id);
+  } else {
+    // Insert new stock item
+    result = await supabase
+      .from('stock_other')
+      .insert(dataToSubmit);
   }
+
+  if (result.error) throw result.error;
+
+  // Update the inventory table with the new stock quantity
+  await updateInventory(dataToSubmit);
+
+  // Update raw material's stock level if a raw material was selected
+  if (selectedRawMaterialId) {
+    await updateRawMaterial(selectedRawMaterialId, formData.quantity);
+  }
+
+  if (onSuccess) onSuccess();
+  onClose();
+} catch (error: any) {
+  console.error('Error saving other stock:', error);
+  alert('Failed to save stock item. Please try again.');
+} finally {
+  setLoading(false);
+}
 
   // Update or insert into inventory
   const updateInventory = async (stockItem: OtherStock) => {
