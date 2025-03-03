@@ -251,7 +251,7 @@ try {
 } catch (error: any) {
   console.error('Error updating product type:', error);
   setError('Failed to update product type: ' + error.message);
-}
+};
 
   const handleDeleteType = async (typeId: string) => {
     const typeToDelete = productTypes.find(t => t.id === typeId)
