@@ -74,18 +74,18 @@ export default function ProductRecipesPage() {
       if (recipesError) throw recipesError
       
       // Format recipes with items and calculate total price
-      const formattedRecipes = (recipesData || []).map(recipe => ({
-        ...recipe,
-        items: (recipe.items || []).map(item => ({
-          ...item,
-          raw_material_name: item.raw_material?.name
-        })),
-        // Calculate total price from recipe items
-        total_price: (recipe.items || []).reduce(
-          (total, item) => total + (item.total_cost || 0), 
-          0
-        )
-      }))
+      const formattedRecipes = (recipesData || []).map((recipe: any) => ({
+       ...recipe,
+        items: (recipe.items || []).map((item: any) => ({
+         ...item,
+         raw_material_name: item.raw_material?.name
+          })),
+          // Calculate total price from recipe items
+          total_price: (recipe.items || []).reduce(
+          (total: number, item: any) => total + (item.total_cost || 0),
+           0
+            )
+            }))
       
       setRecipes(formattedRecipes)
     } catch (error: any) {
