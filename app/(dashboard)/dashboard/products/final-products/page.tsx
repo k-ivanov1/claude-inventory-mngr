@@ -2,12 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Search 
-} from 'lucide-react'
+import { Plus, Edit2, Trash2, Search } from 'lucide-react'
 import { FinalProductForm } from './final-product-form'
 
 // Updated Final Product interface
@@ -61,10 +56,7 @@ export default function FinalProductsPage() {
     try {
       const { data, error } = await supabase
         .from('final_products')
-        .select(
-          *,
-          recipe:recipe_id(name, total_price)
-        )
+        .select(`*, recipe:recipe_id(name, total_price)`)
         .order('name')
       
       if (error) throw error
@@ -293,29 +285,49 @@ export default function FinalProductsPage() {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">Loading...</td>
+                  <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                    Loading...
+                  </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">No final products found.</td>
+                  <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No final products found.
+                  </td>
                 </tr>
               ) : (
                 filteredProducts.map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{product.name}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{product.recipe_name}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{product.category}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">£{product.recipe_cost.toFixed(2)}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">£{product.unit_selling_price.toFixed(2)}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{product.markup.toFixed(2)}%</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{product.profit_margin.toFixed(2)}%</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">£{product.profit_per_item.toFixed(2)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      {product.name}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {product.recipe_name}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {product.category}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      £{product.recipe_cost.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      £{product.unit_selling_price.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {product.markup.toFixed(2)}%
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {product.profit_margin.toFixed(2)}%
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      £{product.profit_per_item.toFixed(2)}
+                    </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
-                      <span className={inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         product.is_active 
                           ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
-                      }}>
+                      }`}>
                         {product.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
