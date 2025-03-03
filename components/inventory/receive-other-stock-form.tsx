@@ -78,9 +78,8 @@ export function ReceiveOtherStockForm({
         .from('raw_materials')
         .select('id, name, unit, category, stock_level')
         .eq('is_active', true)
-        // .not('category', 'in', '(tea,coffee)') // <--- Uncomment if you want to exclude tea/coffee
+        // .not('category', 'in', '(tea,coffee)') // Uncomment if you want to exclude tea/coffee
         .order('name')
-
       if (error) throw error
       setRawMaterials(data || [])
     } catch (error: any) {
@@ -96,7 +95,6 @@ export function ReceiveOtherStockForm({
         .select('id, name')
         .eq('is_approved', true)
         .order('name')
-      
       if (error) throw error
       setSuppliers(data || [])
     } catch (error) {
@@ -110,7 +108,6 @@ export function ReceiveOtherStockForm({
         .from('product_types')
         .select('type')
         .order('type')
-      
       if (error) throw error
       setProductTypes(data ? data.map((item: { type: string }) => item.type) : [])
     } catch (error) {
@@ -125,7 +122,6 @@ export function ReceiveOtherStockForm({
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target
-    
     if (type === 'checkbox') {
       setFormData(prev => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }))
     } else if (type === 'number') {
@@ -144,7 +140,6 @@ export function ReceiveOtherStockForm({
         .eq('id', rawMaterialId)
         .single()
       if (error) throw error
-      
       const newStockLevel = (rawMaterial?.stock_level || 0) + quantity
       const { error: updateError } = await supabase
         .from('raw_materials')
@@ -160,58 +155,54 @@ export function ReceiveOtherStockForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    try {
+      const dataToSubmit = {
+        date: formData.date,
+        product_name: formData.product_name,
+        type: formData.type,
+        supplier: formData.supplier,
+        invoice_number: formData.invoice_number,
+        quantity: formData.quantity,
+        price_per_unit: formData.price_per_unit,
+        is_damaged: formData.is_damaged,
+        is_accepted: formData.is_accepted,
+        checked_by: formData.checked_by,
+        total_cost: formData.quantity * formData.price_per_unit,
+      }
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  try {
-    const dataToSubmit = {
-      date: formData.date,
-      product_name: formData.product_name,
-      type: formData.type,
-      supplier: formData.supplier,
-      invoice_number: formData.invoice_number,
-      quantity: formData.quantity,
-      price_per_unit: formData.price_per_unit,
-      is_damaged: formData.is_damaged,
-      is_accepted: formData.is_accepted,
-      checked_by: formData.checked_by,
-      total_cost: formData.quantity * formData.price_per_unit,
-    };
+      let result
+      if (editItem?.id) {
+        // Update existing stock item
+        result = await supabase
+          .from('stock_other')
+          .update(dataToSubmit)
+          .eq('id', editItem.id)
+      } else {
+        // Insert new stock item
+        result = await supabase
+          .from('stock_other')
+          .insert(dataToSubmit)
+      }
 
-    let result;
-    if (editItem?.id) {
-      // Update existing stock item
-      result = await supabase
-        .from('stock_other')
-        .update(dataToSubmit)
-        .eq('id', editItem.id);
-    } else {
-      // Insert new stock item
-      result = await supabase
-        .from('stock_other')
-        .insert(dataToSubmit);
+      if (result.error) throw result.error
+
+      // Update inventory table with the new stock quantity
+      await updateInventory(dataToSubmit)
+
+      // Update raw material's stock level if a raw material was selected
+      if (selectedRawMaterialId) {
+        await updateRawMaterial(selectedRawMaterialId, formData.quantity)
+      }
+
+      if (onSuccess) onSuccess()
+      onClose()
+    } catch (error: any) {
+      console.error('Error saving other stock:', error)
+      alert('Failed to save stock item. Please try again.')
+    } finally {
+      setLoading(false)
     }
-
-    if (result.error) throw result.error;
-
-    // Update inventory table with the new stock quantity
-    await updateInventory(dataToSubmit);
-
-    // Update raw material's stock level if a raw material was selected
-    if (selectedRawMaterialId) {
-      await updateRawMaterial(selectedRawMaterialId, formData.quantity);
-    }
-
-    if (onSuccess) onSuccess();
-    onClose();
-  } catch (error: any) {
-    console.error('Error saving other stock:', error);
-    alert('Failed to save stock item. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-}; // End handleSubmit function
+  } // End handleSubmit function
 
   // Update or insert into inventory
   const updateInventory = async (stockItem: OtherStock) => {
@@ -276,9 +267,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 name="date"
                 value={formData.date}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
-                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm 
+                  focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 
+                  text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -292,9 +283,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 name="type"
                 value={formData.type}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
-                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm 
+                  focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 
+                  text-gray-900 dark:text-gray-100"
                 required
               >
                 <option value="">Select a product type</option>
@@ -315,20 +306,20 @@ const handleSubmit = async (e: React.FormEvent) => {
                 name="raw_material_id"
                 value={selectedRawMaterialId}
                 onChange={(e) => {
-                  const matId = e.target.value
-                  setSelectedRawMaterialId(matId)
-                  const selectedMaterial = rawMaterials.find(m => m.id === matId)
+                  const matId = e.target.value;
+                  setSelectedRawMaterialId(matId);
+                  const selectedMaterial = rawMaterials.find(m => m.id === matId);
                   if (selectedMaterial) {
                     setFormData(prev => ({
                       ...prev,
                       product_name: selectedMaterial.name,
                       type: selectedMaterial.category
-                    }))
+                    }));
                   }
                 }}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
-                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm 
+                  focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 
+                  text-gray-900 dark:text-gray-100"
               >
                 <option value="">Select a raw material</option>
                 {rawMaterials.map((material) => (
@@ -348,9 +339,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 name="supplier"
                 value={formData.supplier}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
-                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm 
+                  focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 
+                  text-gray-900 dark:text-gray-100"
                 required
               >
                 <option value="">Select a supplier</option>
@@ -372,9 +363,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 name="invoice_number"
                 value={formData.invoice_number}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
-                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm 
+                  focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 
+                  text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -391,9 +382,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 onChange={handleChange}
                 min="0"
                 step="1"
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
-                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm 
+                  focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 
+                  text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -410,9 +401,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 onChange={handleChange}
                 min="0"
                 step="any"
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
-                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm 
+                  focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 
+                  text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
@@ -427,9 +418,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 name="checked_by"
                 value={formData.checked_by}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 
-                  shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm 
-                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm 
+                  focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 
+                  text-gray-900 dark:text-gray-100"
                 required
               />
             </div>
