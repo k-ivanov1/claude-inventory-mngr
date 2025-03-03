@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { X, Plus, AlertTriangle, CheckCircle } from 'lucide-react'
+import { TeaCoffeeStock } from '@/lib/types/stock'
 
-// Raw material interface
+// Raw material interface remains the same
 interface RawMaterial {
   id: string
   name: string
@@ -16,29 +17,6 @@ interface RawMaterial {
 interface ProductType {
   id?: string
   name: string
-}
-
-// Tea/Coffee specific fields
-interface TeaCoffeeStock {
-  id?: string
-  date: string
-  product_name: string
-  raw_material_id: string
-  type: string
-  supplier: string
-  invoice_number: string
-  batch_number: string
-  best_before_date: string
-  quantity: number
-  price_per_unit: number
-  package_size: number // in kg
-  is_damaged: boolean
-  is_accepted: boolean
-  checked_by: string
-  labelling_matches_specifications: boolean
-  total_kg?: number // Calculated field
-  price_per_kg?: number // Calculated field
-  total_cost?: number // Calculated field
 }
 
 interface ReceiveTeaCoffeeFormProps {
@@ -70,10 +48,10 @@ export function ReceiveTeaCoffeeForm({
   // State for approved suppliers
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
   
+  // Note: raw_material_id removed. product_name will be set from the raw materials selection.
   const [formData, setFormData] = useState<TeaCoffeeStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
-    raw_material_id: '',
     type: 'tea',
     supplier: '',
     invoice_number: '',
@@ -81,7 +59,7 @@ export function ReceiveTeaCoffeeForm({
     best_before_date: '',
     quantity: 0,
     price_per_unit: 0,
-    package_size: 0, // in kg
+    package_size: 0, // in grams as defined in your type
     is_damaged: false,
     is_accepted: true,
     checked_by: '',
@@ -96,7 +74,7 @@ export function ReceiveTeaCoffeeForm({
 
   useEffect(() => {
     if (editItem) {
-      // If editing, convert package_size from grams to kg if necessary
+      // If editing, ensure the labelling_matches_specifications field is defined
       setFormData({
         ...editItem,
         labelling_matches_specifications: editItem.labelling_matches_specifications ?? true
@@ -195,18 +173,6 @@ export function ReceiveTeaCoffeeForm({
     } else {
       setFormData({ ...formData, [name]: value })
     }
-    
-    // When raw_material_id changes, update the product_name
-    if (name === 'raw_material_id') {
-      const selectedMaterial = rawMaterials.find(material => material.id === value)
-      if (selectedMaterial) {
-        setFormData(prev => ({ 
-          ...prev, 
-          [name]: value,
-          product_name: selectedMaterial.name
-        }))
-      }
-    }
   }
 
   // Type management functions
@@ -229,12 +195,11 @@ export function ReceiveTeaCoffeeForm({
       
       if (error) throw error
       
-      // If successful, update product types
       await fetchProductTypes()
       setNewTypeName('')
       setSuccess('Type added successfully')
       
-      // Auto-select the new type
+      // Auto-select the new type if desired
       if (data && data[0]) {
         setFormData(prev => ({ ...prev, type: data[0].name }))
       }
@@ -266,15 +231,12 @@ export function ReceiveTeaCoffeeForm({
       
       if (error) throw error
       
-      // If successful, update product types
       await fetchProductTypes()
       
-      // Reset editing state
       setEditingTypeId(null)
       setEditingTypeName('')
       setSuccess('Type updated successfully')
       
-      // If the current form type was the edited one, update it
       if (formData.type === productTypes.find(t => t.id === editingTypeId)?.name) {
         setFormData(prev => ({ ...prev, type: editingTypeName.trim() }))
       }
@@ -294,7 +256,6 @@ export function ReceiveTeaCoffeeForm({
     }
     
     try {
-      // Check if type is in use
       const { count, error: countError } = await supabase
         .from('stock_tea_coffee')
         .select('id', { count: 'exact', head: true })
@@ -314,7 +275,6 @@ export function ReceiveTeaCoffeeForm({
       
       if (error) throw error
       
-      // If successful, update product types
       await fetchProductTypes()
       setSuccess('Type deleted successfully')
     } catch (error: any) {
@@ -329,10 +289,11 @@ export function ReceiveTeaCoffeeForm({
     material.category.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Calculate derived values
-  const totalKg = formData.quantity * formData.package_size
+  // Calculated fields
+  // Note: package_size is stored in grams, so convert to kg where needed.
+  const totalKg = formData.quantity * (formData.package_size / 1000)
   const pricePerKg = formData.package_size > 0 
-    ? formData.price_per_unit / formData.package_size
+    ? formData.price_per_unit / (formData.package_size / 1000)
     : 0
   const totalCost = formData.quantity * formData.price_per_unit
 
@@ -343,8 +304,8 @@ export function ReceiveTeaCoffeeForm({
     setSuccess(null)
     
     try {
-      // Validate required fields
-      if (!formData.raw_material_id || !formData.product_name) {
+      // Basic validations
+      if (!formData.product_name) {
         throw new Error('Please select a product')
       }
       
@@ -368,7 +329,6 @@ export function ReceiveTeaCoffeeForm({
         throw new Error('Package size must be greater than zero')
       }
       
-      // Prepare data for submission
       const dataToSubmit = {
         ...formData,
         total_kg: totalKg,
@@ -378,13 +338,11 @@ export function ReceiveTeaCoffeeForm({
       
       let result
       if (editItem?.id) {
-        // Update existing item
         result = await supabase
           .from('stock_tea_coffee')
           .update(dataToSubmit)
           .eq('id', editItem.id)
       } else {
-        // Insert new item
         result = await supabase
           .from('stock_tea_coffee')
           .insert(dataToSubmit)
@@ -392,15 +350,11 @@ export function ReceiveTeaCoffeeForm({
       
       if (result.error) throw result.error
       
-      // Update inventory table
       await updateInventory(formData)
       
-      // Show success message
       setSuccess('Stock received successfully')
       setTimeout(() => {
-        if (onSuccess) {
-          onSuccess()
-        }
+        if (onSuccess) onSuccess()
         onClose()
       }, 1500)
     } catch (error: any) {
@@ -413,7 +367,6 @@ export function ReceiveTeaCoffeeForm({
 
   const updateInventory = async (stockItem: TeaCoffeeStock) => {
     try {
-      // Check if item exists in inventory
       const { data: existingItem } = await supabase
         .from('inventory')
         .select('*')
@@ -424,13 +377,11 @@ export function ReceiveTeaCoffeeForm({
       const stockValue = stockItem.quantity
       
       if (existingItem) {
-        // Calculate quantity adjustment
         let quantityAdjustment = stockValue
         if (editItem?.id) {
           quantityAdjustment = stockValue - (editItem.quantity || 0)
         }
         
-        // Update existing inventory item
         await supabase
           .from('inventory')
           .update({
@@ -440,13 +391,11 @@ export function ReceiveTeaCoffeeForm({
           })
           .eq('id', existingItem.id)
       } else {
-        // Generate SKU
         const prefix = stockItem.type.substring(0, 3).toUpperCase()
         const timestamp = Date.now().toString().substring(9, 13)
         const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
         const sku = `${prefix}-${timestamp}${random}`
         
-        // Create new inventory item
         await supabase
           .from('inventory')
           .insert({
@@ -456,8 +405,8 @@ export function ReceiveTeaCoffeeForm({
             stock_level: stockValue,
             unit_price: stockItem.price_per_unit,
             supplier: stockItem.supplier,
-            reorder_point: 5, // Default reorder point
-            unit: 'kg', // Default unit
+            reorder_point: 5,
+            unit: 'g', // As package_size is in grams
           })
       }
     } catch (error) {
@@ -660,15 +609,15 @@ export function ReceiveTeaCoffeeForm({
                     />
                   </div>
                   <select
-                    name="raw_material_id"
-                    value={formData.raw_material_id}
+                    name="product_name"
+                    value={formData.product_name}
                     onChange={handleChange}
                     className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                     required
                   >
                     <option value="">Select a product</option>
                     {filteredRawMaterials.map((material) => (
-                      <option key={material.id} value={material.id}>
+                      <option key={material.id} value={material.name}>
                         {material.name} ({material.category})
                       </option>
                     ))}
@@ -765,22 +714,22 @@ export function ReceiveTeaCoffeeForm({
               />
             </div>
 
-            {/* Package Size Field - now in kg */}
+            {/* Package Size Field (in grams) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Package Size (kg) *
+                Package Size (grams) *
               </label>
               <input
                 type="number"
                 name="package_size"
                 value={formData.package_size}
                 onChange={handleChange}
-                min="0.001"
-                step="0.001"
+                min="1"
+                step="1"
                 className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter package size in kilograms (e.g., 0.5 for 500g)</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter package size in grams</p>
             </div>
 
             {/* Price per Unit Field */}
@@ -877,10 +826,7 @@ export function ReceiveTeaCoffeeForm({
                 />
               </div>
               <div className="ml-3 text-sm">
-                <label
-                  htmlFor="labelling_matches_specifications"
-                  className="font-medium text-gray-700 dark:text-gray-300"
-                >
+                <label htmlFor="labelling_matches_specifications" className="font-medium text-gray-700 dark:text-gray-300">
                   Labelling matches specifications
                 </label>
                 <p className="text-gray-500 dark:text-gray-400">Confirm the product labelling is accurate and complete</p>
