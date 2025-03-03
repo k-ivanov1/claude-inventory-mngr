@@ -10,7 +10,7 @@ import {
   Eye
 } from 'lucide-react'
 import Link from 'next/link'
-import { RecipeForm } from './recipe-form'
+import { RecipeForm } from '@/components/products/recipes/recipe-form'
 
 interface RecipeItem {
   id?: string
