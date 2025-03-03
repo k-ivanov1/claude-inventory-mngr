@@ -18,35 +18,34 @@ interface OtherStockFormProps {
   editItem?: OtherStock
 }
 
-export function ReceiveOtherStockForm({ 
-  onClose, 
-  onSuccess, 
-  editItem 
-}: OtherStockFormProps) {
+export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: OtherStockFormProps) {
   const [loading, setLoading] = useState(false)
   const supabase = createClientComponentClient()
 
-  // State for raw materials and search
+  // State for raw materials, search, and selected raw material ID
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedRawMaterialId, setSelectedRawMaterialId] = useState<string>('')
 
   // State for approved suppliers
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
-  
+
   // State for product types
   const [productTypes, setProductTypes] = useState<string[]>([])
 
+  // Note: Although OtherStock type includes batch_number and package_size,
+  // these fields are not needed in the UI. We set them to default values.
   const [formData, setFormData] = useState<OtherStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
     type: '', 
     supplier: '',
     invoice_number: '',
-    batch_number: '',
+    batch_number: '', // will be overridden as ""
     best_before_date: '',
     quantity: 0,
     price_per_unit: 0,
-    package_size: 0,
+    package_size: 0,  // will be overridden as 0
     is_damaged: false,
     is_accepted: true,
     checked_by: '',
@@ -60,7 +59,6 @@ export function ReceiveOtherStockForm({
         labelling_matches_specifications: editItem.labelling_matches_specifications ?? true
       })
     }
-    
     fetchRawMaterials()
     fetchSuppliers()
     fetchProductTypes()
@@ -71,7 +69,7 @@ export function ReceiveOtherStockForm({
       // Fetch raw materials excluding tea and coffee
       const { data, error } = await supabase
         .from('raw_materials')
-        .select('id, name, unit, category')
+        .select('id, name, unit, category, stock_level')
         .not('category', 'in', '(tea,coffee)')
         .eq('is_active', true)
         .order('name')
@@ -122,7 +120,6 @@ export function ReceiveOtherStockForm({
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target
-    
     if (type === 'checkbox') {
       const checkboxInput = e.target as HTMLInputElement
       setFormData({ ...formData, [name]: checkboxInput.checked })
@@ -133,7 +130,7 @@ export function ReceiveOtherStockForm({
     }
   }
 
-  // Filtered raw materials based on search
+  // Filter raw materials based on search term
   const filteredRawMaterials = rawMaterials.filter(material => 
     material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     material.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -143,8 +140,11 @@ export function ReceiveOtherStockForm({
     e.preventDefault()
     setLoading(true)
     try {
+      // Override batch_number and package_size as these fields are not required
       const dataToSubmit = {
         ...formData,
+        batch_number: "",
+        package_size: 0,
         total_cost: formData.quantity * formData.price_per_unit
       }
       
@@ -166,12 +166,17 @@ export function ReceiveOtherStockForm({
       
       // Update inventory table if applicable
       await updateInventory(dataToSubmit)
+
+      // Update raw material's stock level if a raw material was selected
+      if (selectedRawMaterialId) {
+        await updateRawMaterial(selectedRawMaterialId, formData.quantity)
+      }
       
       if (onSuccess) {
         onSuccess()
       }
       onClose()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving other stock:', error)
       alert('Failed to save stock item. Please try again.')
     } finally {
@@ -214,6 +219,25 @@ export function ReceiveOtherStockForm({
           reorder_point: 5,
           sku: `${stockItem.type.substring(0, 3)}-${Date.now()}`,
         })
+    }
+  }
+
+  const updateRawMaterial = async (rawMaterialId: string, quantity: number) => {
+    try {
+      const { data: rawMaterial, error } = await supabase
+         .from('raw_materials')
+         .select('stock_level')
+         .eq('id', rawMaterialId)
+         .single();
+      if (error) throw error;
+      const newStockLevel = (rawMaterial.stock_level || 0) + quantity;
+      const { error: updateError } = await supabase
+         .from('raw_materials')
+         .update({ stock_level: newStockLevel })
+         .eq('id', rawMaterialId);
+      if (updateError) throw updateError;
+    } catch (error) {
+      console.error("Error updating raw material", error);
     }
   }
 
@@ -267,7 +291,7 @@ export function ReceiveOtherStockForm({
               </select>
             </div>
 
-            {/* Product Selection Field */}
+            {/* Raw Material Selection Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Raw Material
@@ -292,6 +316,7 @@ export function ReceiveOtherStockForm({
                               product_name: material.name,
                               type: material.category
                             });
+                            setSelectedRawMaterialId(material.id);
                             setSearchTerm('');
                           }}
                           className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
@@ -344,21 +369,6 @@ export function ReceiveOtherStockForm({
                 type="text"
                 name="invoice_number"
                 value={formData.invoice_number}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                required
-              />
-            </div>
-
-            {/* Batch Number Field */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Batch Number
-              </label>
-              <input
-                type="text"
-                name="batch_number"
-                value={formData.batch_number}
                 onChange={handleChange}
                 className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
@@ -488,23 +498,6 @@ export function ReceiveOtherStockForm({
                 </label>
               </div>
             </div>
-          </div>
-
-          {/* Package Size Field */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Package Size (grams)
-            </label>
-            <input
-              type="number"
-              name="package_size"
-              value={formData.package_size}
-              onChange={handleChange}
-              min="0"
-              step="1"
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-              required
-            />
           </div>
 
           {/* Calculated Fields */}
