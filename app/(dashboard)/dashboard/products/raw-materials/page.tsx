@@ -85,11 +85,12 @@ export default function RawMaterialsPage() {
       const materialIds = formattedMaterials.map(m => m.id)
       
       if (materialIds.length > 0) {
-        const { data: inventoryData, error: inventoryError } = await supabase
-          .from('inventory')
-          .select('current_stock, unit, item_id')
-          .eq('item_type', 'raw_material')
-          .in('item_id', materialIds)
+       const { data: inventoryData, error: inventoryError } = await supabase
+      .from('inventory')
+      .select('current_stock, unit_price, item_id')
+       .eq('item_type', 'raw_material')
+       .in('item_id', materialIds)
+
         
         if (inventoryError) throw inventoryError
         
