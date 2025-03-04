@@ -132,7 +132,7 @@ export function Sidebar() {
             <button
               onClick={() => toggleSubmenu(item.name)}
               className={cn(
-                'flex w-full items-center justify-between gap-x-3 rounded-lg px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:border-current transition-all duration-300',
+                'flex w-full items-center justify-between gap-x-3 rounded-lg px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:border-current hover:rounded-[20px] transition-all duration-300',
                 active
                   ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-[20px]'
                   : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
@@ -159,7 +159,7 @@ export function Sidebar() {
                     key={subItem.name}
                     href={subItem.href || '#'}
                     className={cn(
-                      'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:border-current transition-all duration-300',
+                      'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:border-current hover:rounded-[20px] transition-all duration-300',
                       isActive(subItem.href)
                         ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-[20px]'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
@@ -178,7 +178,7 @@ export function Sidebar() {
           <Link
             href={item.href || '#'}
             className={cn(
-              'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:border-current transition-all duration-300',
+              'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:border-current hover:rounded-[20px] transition-all duration-300',
               active
                 ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-[20px]'
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
