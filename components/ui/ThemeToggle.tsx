@@ -7,19 +7,37 @@ export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme()
 
   return (
-    <div
-      className="relative flex items-center bg-gray-300 dark:bg-gray-600 rounded-full w-28 h-12 p-1 cursor-pointer select-none"
+    <button
       onClick={toggleTheme}
+      aria-label="Toggle Theme"
+      className="relative flex items-center w-40 h-12 bg-gray-200 dark:bg-gray-800 rounded-full p-1 focus:outline-none shadow-xl transition-colors duration-500"
     >
-      <div
-        className={`absolute bg-white rounded-full w-10 h-10 transition-transform duration-300 ${
-          theme === 'dark' ? 'translate-x-[16px]' : 'translate-x-0'
-        }`}
-      />
-      <div className="flex flex-1 justify-around items-center relative z-10">
-        <Sun className={`h-6 w-6 ${theme === 'light' ? 'text-gray-900' : 'text-gray-500'}`} />
-        <Moon className={`h-6 w-6 ${theme === 'dark' ? 'text-gray-900' : 'text-gray-500'}`} />
+      {/* Background gradient overlay */}
+      <div className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-r from-indigo-500 to-purple-500 opacity-30" />
+      
+      {/* Content container */}
+      <div className="flex items-center justify-between w-full relative z-10 px-3">
+        {/* Sun Icon */}
+        <Sun
+          className={`h-6 w-6 transition-colors duration-300 ${
+            theme === 'light' ? 'text-yellow-500' : 'text-gray-400'
+          }`}
+        />
+        {/* Slider container */}
+        <div className="relative flex-1 mx-3">
+          <div
+            className={`absolute h-8 w-8 bg-white dark:bg-gray-900 rounded-full shadow-lg transform transition-transform duration-300 ${
+              theme === 'light' ? 'translate-x-0' : 'translate-x-32'
+            }`}
+          />
+        </div>
+        {/* Moon Icon */}
+        <Moon
+          className={`h-6 w-6 transition-colors duration-300 ${
+            theme === 'dark' ? 'text-indigo-500' : 'text-gray-400'
+          }`}
+        />
       </div>
-    </div>
+    </button>
   )
 }
