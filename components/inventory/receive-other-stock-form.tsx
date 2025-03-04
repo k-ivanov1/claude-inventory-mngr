@@ -25,7 +25,7 @@ export function ReceiveOtherStockForm({
   editItem 
 }: OtherStockFormProps) {
   const supabase = createClientComponentClient()
-  
+
   // Loading state for the form submission
   const [loading, setLoading] = useState(false)
   
@@ -78,7 +78,6 @@ export function ReceiveOtherStockForm({
         .from('raw_materials')
         .select('id, name, unit, category, stock_level')
         .eq('is_active', true)
-        // .not('category', 'in', '(tea,coffee)') // Uncomment if you want to exclude tea/coffee
         .order('name')
       if (error) throw error
       setRawMaterials(data || [])
@@ -157,23 +156,18 @@ export function ReceiveOtherStockForm({
     setLoading(true)
     try {
       const dataToSubmit = {
-  date: formData.date,
-  product_name: formData.product_name,
-  type: formData.type,
-  supplier: formData.supplier,
-  invoice_number: formData.invoice_number,
-  batch_number: formData.batch_number,           // Added
-  best_before_date: formData.best_before_date,     // Added
-  quantity: formData.quantity,
-  price_per_unit: formData.price_per_unit,
-  package_size: formData.package_size,             // Added
-  is_damaged: formData.is_damaged,
-  is_accepted: formData.is_accepted,
-  checked_by: formData.checked_by,
-  labelling_matches_specifications: formData.labelling_matches_specifications, // Added
-  total_cost: formData.quantity * formData.price_per_unit,
-}
-
+        date: formData.date,
+        product_name: formData.product_name,
+        type: formData.type,
+        supplier: formData.supplier,
+        invoice_number: formData.invoice_number,
+        quantity: formData.quantity,
+        price_per_unit: formData.price_per_unit,
+        is_damaged: formData.is_damaged,
+        is_accepted: formData.is_accepted,
+        checked_by: formData.checked_by,
+        total_cost: formData.quantity * formData.price_per_unit,
+      }
 
       let result
       if (editItem?.id) {
@@ -209,8 +203,10 @@ export function ReceiveOtherStockForm({
     }
   } // End handleSubmit function
 
-  // Update or insert into inventory
-  const updateInventory = async (stockItem: OtherStock) => {
+  // Update or insert into inventory using only the necessary fields
+  const updateInventory = async (
+    stockItem: Pick<OtherStock, "product_name" | "type" | "supplier" | "quantity" | "price_per_unit">
+  ) => {
     const { data: existingItem } = await supabase
       .from('inventory')
       .select('*')
