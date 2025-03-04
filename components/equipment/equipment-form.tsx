@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { X } from 'lucide-react'
+import { Wrench } from 'lucide-react' // Changed from X to Wrench
 
 // Equipment interface to match database schema
 interface Equipment {
@@ -178,7 +178,7 @@ export function EquipmentForm({
             onClick={onClose}
             className="text-gray-400 hover:text-gray-500"
           >
-            <X className="h-5 w-5" />
+            <Wrench className="h-5 w-5" /> {/* Updated icon */}
           </button>
         </div>
 
