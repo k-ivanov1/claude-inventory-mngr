@@ -93,20 +93,50 @@ export default function FinalProductsPage() {
     }
   }
 
+  // UPDATED fetchRecipes FUNCTION:
   const fetchRecipes = async () => {
     try {
+      // Get recipes with their updated total prices and recipe items
       const { data, error } = await supabase
         .from('product_recipes')
-        .select('id, name, total_price')
+        .select(`
+          id, 
+          name, 
+          total_price,
+          items:recipe_items(
+            raw_material_id,
+            quantity,
+            unit_cost,
+            total_cost
+          )
+        `)
         .eq('is_active', true)
       
       if (error) throw error
       
-      setRecipes(data || [])
-    } catch (error: any) {
-      console.error('Error fetching recipes:', error)
+      // For each recipe, recalculate total price based on current average costs
+      const updatedRecipes = await Promise.all((data || []).map(async (recipe) => {
+        let updatedTotalPrice = 0;
+        
+        for (const item of recipe.items) {
+          const { data: avgCostData } = await supabase
+            .rpc('get_raw_material_avg_cost', { material_id: item.raw_material_id });
+          
+          const avgCost = avgCostData || 0;
+          updatedTotalPrice += avgCost * item.quantity;
+        }
+        
+        return {
+          ...recipe,
+          total_price: updatedTotalPrice
+        };
+      }));
+      
+      setRecipes(updatedRecipes);
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
     }
-  }
+  };
 
   const fetchCategories = async () => {
     try {
