@@ -2,13 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Search,
-  AlertTriangle
-} from 'lucide-react'
+import { Plus, Edit2, Trash2, Search, AlertTriangle } from 'lucide-react'
 import { RawMaterialForm } from '@/components/products/raw-materials/raw-material-form'
 
 // Raw Material interface
@@ -25,11 +19,12 @@ interface RawMaterial {
   supplier_name?: string // Joined field for display
 }
 
-// Inventory interface to show current stock
+// Inventory interface to show current stock and average cost
 interface InventoryItem {
   item_id: string
   current_stock: number
   unit_price: number
+  average_cost?: number
 }
 
 export default function RawMaterialsPage() {
@@ -49,7 +44,7 @@ export default function RawMaterialsPage() {
     fetchCategories()
   }, [])
 
-  // Filter products whenever search term or products change
+  // Filter raw materials based on the search term
   useEffect(() => {
     const term = searchTerm.toLowerCase()
     const filtered = rawMaterials.filter(material => 
@@ -85,24 +80,48 @@ export default function RawMaterialsPage() {
       const materialIds = formattedMaterials.map(m => m.id)
       
       if (materialIds.length > 0) {
-       const { data: inventoryData, error: inventoryError } = await supabase
-      .from('inventory')
-      .select('current_stock, unit_price, item_id')
-       .eq('item_type', 'raw_material')
-       .in('item_id', materialIds)
-
+        // Get stock entries to calculate average cost
+        const { data: stockData, error: stockError } = await supabase
+          .from('stock_tea_coffee')
+          .select('product_name, price_per_unit')
+          .eq('is_accepted', true)
+        
+        if (stockError) throw stockError
+        
+        // Get regular inventory data
+        const { data: inventoryData, error: inventoryError } = await supabase
+          .from('inventory')
+          .select('current_stock, unit_price, item_id')
+          .eq('item_type', 'raw_material')
+          .in('item_id', materialIds)
         
         if (inventoryError) throw inventoryError
         
-        // Merge inventory data with raw materials
+        // Merge inventory data with raw materials and calculate average costs
         const materialsWithInventory = formattedMaterials.map(material => {
           const inventory = inventoryData?.find(inv => inv.item_id === material.id)
+          
+          // Find all stock entries for this material to calculate average cost
+          const materialStockEntries = stockData?.filter(entry => 
+            entry.product_name === material.name
+          ) || []
+          
+          // Calculate average cost if stock entries exist, otherwise use current unit price
+          let averageCost = inventory?.unit_price || 0
+          if (materialStockEntries.length > 0) {
+            const totalCost = materialStockEntries.reduce((sum, entry) => 
+              sum + (entry.price_per_unit || 0), 0
+            )
+            averageCost = totalCost / materialStockEntries.length
+          }
+          
           return {
             ...material,
             inventory: inventory ? {
               item_id: inventory.item_id,
               current_stock: inventory.current_stock,
-              unit_price: inventory.unit_price
+              unit_price: inventory.unit_price,
+              average_cost: averageCost
             } : undefined
           }
         })
@@ -119,38 +138,33 @@ export default function RawMaterialsPage() {
     }
   }
 
-const fetchCategories = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('raw_materials')
-      .select('category')
-      .not('category', 'is', null)
-    
-    if (error) throw error
-    
-    if (data && data.length > 0) {
-      // Create an object to track unique categories instead of using Set
-      const categoryMap: Record<string, boolean> = {};
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('raw_materials')
+        .select('category')
+        .not('category', 'is', null)
       
-      // Add each category to the map
-      data.forEach(item => {
-        if (item.category) {
-          categoryMap[item.category] = true;
+      if (error) throw error
+      
+      if (data && data.length > 0) {
+        // Create an object to track unique categories
+        const categoryMap: Record<string, boolean> = {}
+        data.forEach(item => {
+          if (item.category) {
+            categoryMap[item.category] = true
+          }
+        })
+        const uniqueCategories = Object.keys(categoryMap)
+        if (uniqueCategories.length > 0) {
+          setCategories(uniqueCategories)
         }
-      });
-      
-      // Convert the object keys to an array
-      const uniqueCategories = Object.keys(categoryMap);
-      
-      if (uniqueCategories.length > 0) {
-        setCategories(uniqueCategories);
       }
+    } catch (error: any) {
+      console.error('Error fetching categories:', error)
+      // If fetching categories fails, keep default categories
     }
-  } catch (error: any) {
-    console.error('Error fetching categories:', error);
-    // If fetching categories fails, keep default categories
   }
-}
 
   const handleDeleteMaterial = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this raw material?')) {
@@ -191,11 +205,9 @@ const fetchCategories = async () => {
   }
 
   const handleSaveMaterial = () => {
-    // Close form
+    // Close form and refresh data
     setShowForm(false)
     setEditingMaterial(null)
-    
-    // Refresh data
     fetchRawMaterials()
   }
 
@@ -270,6 +282,9 @@ const fetchCategories = async () => {
                   Supplier
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Average Cost
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -280,13 +295,13 @@ const fetchCategories = async () => {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     Loading...
                   </td>
                 </tr>
               ) : filteredMaterials.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     No raw materials found.
                   </td>
                 </tr>
@@ -305,7 +320,7 @@ const fetchCategories = async () => {
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       {material.inventory ? (
                         <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
-                           material.inventory.current_stock <= material.reorder_point
+                          material.inventory.current_stock <= material.reorder_point
                             ? 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200'
                             : material.inventory.current_stock <= material.reorder_point * 1.5
                             ? 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200'
@@ -322,6 +337,11 @@ const fetchCategories = async () => {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {material.supplier_name || '-'}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {material.inventory?.average_cost 
+                        ? `£${material.inventory.average_cost.toFixed(2)}` 
+                        : '-'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
