@@ -33,7 +33,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useState } from 'react'
-import { ThemeToggle } from '@/components/ThemeToggle' // Import your dark/light mode toggle
+import { ThemeToggle } from '@/components/ui/ThemeToggle' // Import your dark/light mode toggle
 
 // Navigation item with optional submenu
 interface NavItem {
