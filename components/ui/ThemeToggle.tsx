@@ -10,30 +10,26 @@ export function ThemeToggle() {
     <button
       onClick={toggleTheme}
       aria-label="Toggle Theme"
-      className="relative flex items-center w-40 h-12 bg-gray-200 dark:bg-gray-800 rounded-full p-1 focus:outline-none shadow-xl transition-colors duration-500"
+      className="relative flex items-center w-32 h-10 bg-gray-200 dark:bg-gray-800 rounded-full p-1 focus:outline-none shadow-md transition-colors duration-500"
     >
-      {/* Background gradient overlay */}
+      {/* Gradient overlay */}
       <div className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-r from-indigo-500 to-purple-500 opacity-30" />
-      
-      {/* Content container */}
-      <div className="flex items-center justify-between w-full relative z-10 px-3">
-        {/* Sun Icon */}
+
+      {/* Slider circle */}
+      <div
+        className="absolute top-1/2 transform -translate-y-1/2 h-6 w-6 bg-white dark:bg-gray-900 rounded-full shadow-md transition-all duration-300"
+        style={{ left: theme === 'light' ? '0.25rem' : '6.25rem' }}
+      />
+
+      {/* Icons */}
+      <div className="relative z-10 flex w-full items-center justify-between px-2">
         <Sun
-          className={`h-6 w-6 transition-colors duration-300 ${
+          className={`h-5 w-5 transition-colors duration-300 ${
             theme === 'light' ? 'text-yellow-500' : 'text-gray-400'
           }`}
         />
-        {/* Slider container */}
-        <div className="relative flex-1 mx-3">
-          <div
-            className={`absolute h-8 w-8 bg-white dark:bg-gray-900 rounded-full shadow-lg transform transition-transform duration-300 ${
-              theme === 'light' ? 'translate-x-0' : 'translate-x-32'
-            }`}
-          />
-        </div>
-        {/* Moon Icon */}
         <Moon
-          className={`h-6 w-6 transition-colors duration-300 ${
+          className={`h-5 w-5 transition-colors duration-300 ${
             theme === 'dark' ? 'text-indigo-500' : 'text-gray-400'
           }`}
         />
