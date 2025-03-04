@@ -25,7 +25,6 @@ import {
   History,
   Award,
   Trash2,
-  Tool,
   Wrench,
   List
 } from 'lucide-react'
