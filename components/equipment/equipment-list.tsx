@@ -10,7 +10,7 @@ import {
   Filter, 
   ChevronDown,
   Calendar,
-  Tool,
+  Wrench, // Replaced "Tool" with "Wrench"
   AlertTriangle
 } from 'lucide-react'
 import { EquipmentForm } from '@/components/equipment/equipment-form'
@@ -185,7 +185,7 @@ export default function EquipmentList() {
         </div>
         <div className="relative">
           <button
-type="button"
+            type="button"
             onClick={() => setShowStatusFilter(!showStatusFilter)}
             className="inline-flex items-center rounded-md border dark:border-gray-700 border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
           >
@@ -265,7 +265,7 @@ type="button"
                   <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       <div className="flex items-center">
-                        <Tool className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
+                        <Wrench className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
                         {item.description}
                       </div>
                       {item.model && <div className="text-xs text-gray-500 dark:text-gray-400">Model: {item.model}</div>}
