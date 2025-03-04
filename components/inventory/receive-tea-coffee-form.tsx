@@ -5,7 +5,6 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { X, Plus, AlertTriangle, CheckCircle } from 'lucide-react'
 import { TeaCoffeeStock } from '@/lib/types/stock'
 
-// Raw material interface remains the same
 interface RawMaterial {
   id: string
   name: string
@@ -13,7 +12,6 @@ interface RawMaterial {
   category: string
 }
 
-// Type interface for product types
 interface ProductType {
   id?: string
   name: string
@@ -25,11 +23,7 @@ interface ReceiveTeaCoffeeFormProps {
   editItem?: TeaCoffeeStock
 }
 
-export function ReceiveTeaCoffeeForm({ 
-  onClose, 
-  onSuccess, 
-  editItem 
-}: ReceiveTeaCoffeeFormProps) {
+export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTeaCoffeeFormProps) {
   // State
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -37,29 +31,24 @@ export function ReceiveTeaCoffeeForm({
   const [searchTerm, setSearchTerm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  
-  // State for product types management
-  const [productTypes, setProductTypes] = useState<ProductType[]>([])
-  const [isManagingTypes, setIsManagingTypes] = useState(false)
-  const [newTypeName, setNewTypeName] = useState('')
-  const [editingTypeId, setEditingTypeId] = useState<string | null>(null)
-  const [editingTypeName, setEditingTypeName] = useState('')
 
+  // (Type management removed from UI. The type value is now hardcoded.)
   // State for approved suppliers
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
-  
-  // Note: raw_material_id removed. product_name will be set from the raw materials selection.
+
+  // We no longer need a type selection.
+  // Set the default type to "tea" (you can change this in the future if needed)
   const [formData, setFormData] = useState<TeaCoffeeStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
-    type: 'tea',
+    type: 'tea', // Default value, hidden from UI
     supplier: '',
     invoice_number: '',
-    batch_number: '',
-    best_before_date: '',
+    batch_number: '',        // Not mandatory now
+    best_before_date: '',    // Not mandatory now
     quantity: 0,
     price_per_unit: 0,
-    package_size: 0, // in grams as defined in your type
+    package_size: 0,         // Now in KG
     is_damaged: false,
     is_accepted: true,
     checked_by: '',
@@ -74,9 +63,10 @@ export function ReceiveTeaCoffeeForm({
 
   useEffect(() => {
     if (editItem) {
-      // If editing, ensure the labelling_matches_specifications field is defined
+      // When editing, load the existing data.
       setFormData({
         ...editItem,
+        // Ensure this flag is set
         labelling_matches_specifications: editItem.labelling_matches_specifications ?? true
       })
     }
@@ -87,11 +77,10 @@ export function ReceiveTeaCoffeeForm({
     try {
       await Promise.all([
         fetchRawMaterials(),
-        fetchProductTypes(),
         fetchSuppliers()
       ])
-    } catch (error) {
-      console.error('Error fetching data:', error)
+    } catch (err) {
+      console.error('Error fetching data:', err)
       setError('Failed to load data. Please try again.')
     } finally {
       setLoading(false)
@@ -109,37 +98,9 @@ export function ReceiveTeaCoffeeForm({
       if (error) throw error
       
       setRawMaterials(data || [])
-    } catch (error: any) {
-      console.error('Error fetching raw materials:', error)
-      throw error
-    }
-  }
-
-  const fetchProductTypes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('product_types')
-        .select('id, name')
-        .order('name')
-      
-      if (error) throw error
-      
-      if (data && data.length > 0) {
-        setProductTypes(data)
-      } else {
-        // Default product types if none exists
-        setProductTypes([
-          { id: '1', name: 'tea' },
-          { id: '2', name: 'coffee' }
-        ])
-      }
-    } catch (error: any) {
-      console.error('Error fetching product types:', error)
-      // Fallback to default types
-      setProductTypes([
-        { id: '1', name: 'tea' },
-        { id: '2', name: 'coffee' }
-      ])
+    } catch (err: any) {
+      console.error('Error fetching raw materials:', err)
+      throw err
     }
   }
 
@@ -154,9 +115,9 @@ export function ReceiveTeaCoffeeForm({
       if (error) throw error
       
       setSuppliers(data || [])
-    } catch (error: any) {
-      console.error('Error fetching suppliers:', error)
-      throw error
+    } catch (err: any) {
+      console.error('Error fetching suppliers:', err)
+      throw err
     }
   }
 
@@ -164,7 +125,6 @@ export function ReceiveTeaCoffeeForm({
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target
-    
     if (type === 'checkbox') {
       const checkboxInput = e.target as HTMLInputElement
       setFormData({ ...formData, [name]: checkboxInput.checked })
@@ -175,137 +135,16 @@ export function ReceiveTeaCoffeeForm({
     }
   }
 
-  // Type management functions
-  const handleAddType = async () => {
-    if (!newTypeName.trim()) {
-      setError('Type name cannot be empty')
-      return
-    }
-
-    if (productTypes.some(type => type.name.toLowerCase() === newTypeName.toLowerCase())) {
-      setError('This type already exists')
-      return
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('product_types')
-        .insert({ name: newTypeName.trim() })
-        .select()
-      
-      if (error) throw error
-      
-      await fetchProductTypes()
-      setNewTypeName('')
-      setSuccess('Type added successfully')
-      
-      // Auto-select the new type if desired
-      if (data && data[0]) {
-        setFormData(prev => ({ ...prev, type: data[0].name }))
-      }
-    } catch (error: any) {
-      console.error('Error adding product type:', error)
-      setError('Failed to add product type: ' + error.message)
-    }
-  }
-
-  const handleEditType = async () => {
-  if (!editingTypeName.trim() || !editingTypeId) {
-    setError('Type name cannot be empty');
-    return;
-  }
-
-  if (
-    productTypes.some(
-      (type) =>
-        type.id !== editingTypeId &&
-        type.name.toLowerCase() === editingTypeName.toLowerCase()
-    )
-  ) {
-    setError('This type name already exists');
-    return;
-  }
-
-  const newType = editingTypeName.trim();
-  if (newType !== "tea" && newType !== "coffee") {
-    setError('Invalid type. Allowed values are "tea" or "coffee".');
-    return;
-  }
-
-  try {
-    // Save the old type for comparison
-    const oldType = productTypes.find(t => t.id === editingTypeId)?.name;
-    
-    const { error } = await supabase
-      .from('product_types')
-      .update({ name: newType })
-      .eq('id', editingTypeId);
-    
-    if (error) throw error;
-    
-    await fetchProductTypes();
-    
-    setEditingTypeId(null);
-    setEditingTypeName('');
-    setSuccess('Type updated successfully');
-    
-    if (formData.type === oldType) {
-      setFormData(prev => ({ ...prev, type: newType as "tea" | "coffee" }));
-    }
-  } catch (error: any) {
-    console.error('Error updating product type:', error);
-    setError('Failed to update product type: ' + error.message);
-  }
-};
-
-  const handleDeleteType = async (typeId: string) => {
-    const typeToDelete = productTypes.find(t => t.id === typeId)
-    if (!typeToDelete) return
-    
-    if (formData.type === typeToDelete.name) {
-      setError('Cannot delete a type that is currently selected')
-      return
-    }
-    
-    try {
-      const { count, error: countError } = await supabase
-        .from('stock_tea_coffee')
-        .select('id', { count: 'exact', head: true })
-        .eq('type', typeToDelete.name)
-      
-      if (countError) throw countError
-      
-      if (count && count > 0) {
-        setError(`Cannot delete type "${typeToDelete.name}" as it is used by ${count} items`)
-        return
-      }
-      
-      const { error } = await supabase
-        .from('product_types')
-        .delete()
-        .eq('id', typeId)
-      
-      if (error) throw error
-      
-      await fetchProductTypes()
-      setSuccess('Type deleted successfully')
-    } catch (error: any) {
-      console.error('Error deleting product type:', error)
-      setError('Failed to delete product type: ' + error.message)
-    }
-  }
-
   // Filter raw materials based on search term
   const filteredRawMaterials = rawMaterials.filter(material => 
     material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     material.category.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Calculated fields
-  // Note: package_size is stored in grams, so convert to kg where needed.
-  const totalKg = formData.quantity * (formData.package_size / 1000)
+  // Calculated fields (now using KG directly)
+  const totalKg = formData.quantity * formData.package_size
   const pricePerKg = formData.package_size > 0 
-    ? formData.price_per_unit / (formData.package_size / 1000)
+    ? formData.price_per_unit / formData.package_size
     : 0
   const totalCost = formData.quantity * formData.price_per_unit
 
@@ -317,32 +156,16 @@ export function ReceiveTeaCoffeeForm({
     
     try {
       // Basic validations
-      if (!formData.product_name) {
-        throw new Error('Please select a product')
-      }
-      
-      if (!formData.type) {
-        throw new Error('Please select a product type')
-      }
-      
-      if (!formData.supplier) {
-        throw new Error('Please select a supplier')
-      }
-
-      if (!formData.batch_number) {
-        throw new Error('Batch number is required')
-      }
-      
-      if (formData.quantity <= 0) {
-        throw new Error('Quantity must be greater than zero')
-      }
-      
-      if (formData.package_size <= 0) {
-        throw new Error('Package size must be greater than zero')
-      }
+      if (!formData.product_name) throw new Error('Please select a product.')
+      // We no longer validate type since it is hidden.
+      if (!formData.supplier) throw new Error('Please select a supplier.')
+      if (!formData.invoice_number) throw new Error('Invoice number is required.')
+      if (formData.quantity <= 0) throw new Error('Quantity must be greater than zero.')
+      // Batch number, best before date and package size are now optional.
       
       const dataToSubmit = {
         ...formData,
+        // Calculated fields
         total_kg: totalKg,
         price_per_kg: pricePerKg,
         total_cost: totalCost
@@ -369,9 +192,9 @@ export function ReceiveTeaCoffeeForm({
         if (onSuccess) onSuccess()
         onClose()
       }, 1500)
-    } catch (error: any) {
-      console.error('Error saving stock:', error)
-      setError(error.message || 'Failed to save stock. Please try again.')
+    } catch (err: any) {
+      console.error('Error saving stock:', err)
+      setError(err.message || 'Failed to save stock. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -418,11 +241,11 @@ export function ReceiveTeaCoffeeForm({
             unit_price: stockItem.price_per_unit,
             supplier: stockItem.supplier,
             reorder_point: 5,
-            unit: 'g', // As package_size is in grams
+            unit: 'kg', // Now in KG
           })
       }
-    } catch (error) {
-      console.error('Error updating inventory:', error)
+    } catch (err) {
+      console.error('Error updating inventory:', err)
       throw new Error('Failed to update inventory')
     }
   }
@@ -439,23 +262,18 @@ export function ReceiveTeaCoffeeForm({
             </div>
           </div>
         )}
-        
         {/* Error notification */}
         {error && (
           <div className="absolute top-4 right-4 bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded shadow-lg z-50" role="alert">
             <div className="flex items-center">
               <AlertTriangle className="h-5 w-5 mr-2" />
               <span>{error}</span>
-              <button 
-                onClick={() => setError(null)}
-                className="ml-4 text-red-700 dark:text-red-200"
-              >
+              <button onClick={() => setError(null)} className="ml-4 text-red-700 dark:text-red-200">
                 <X className="h-4 w-4" />
               </button>
             </div>
           </div>
         )}
-
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
             {editItem ? 'Edit Tea/Coffee Stock' : 'Receive Tea/Coffee Stock'}
@@ -484,121 +302,7 @@ export function ReceiveTeaCoffeeForm({
                 required
               />
             </div>
-
-            {/* Product Type Field with Management */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Type *
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setIsManagingTypes(!isManagingTypes)}
-                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
-                >
-                  {isManagingTypes ? 'Done' : 'Manage Types'}
-                </button>
-              </div>
-              
-              {isManagingTypes ? (
-                <div className="mt-2 p-3 border rounded-md bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
-                  <h4 className="text-sm font-medium mb-2 text-gray-900 dark:text-white">Manage Product Types</h4>
-                  
-                  {/* Add new type */}
-                  <div className="flex gap-2 mb-4">
-                    <input
-                      type="text"
-                      value={newTypeName}
-                      onChange={(e) => setNewTypeName(e.target.value)}
-                      placeholder="New type name"
-                      className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddType}
-                      className="inline-flex items-center rounded border border-transparent bg-indigo-600 px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add
-                    </button>
-                  </div>
-                  
-                  {/* List of types */}
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {productTypes.map(type => (
-                      <div key={type.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                        {editingTypeId === type.id ? (
-                          <div className="flex items-center flex-grow">
-                            <input
-                              type="text"
-                              value={editingTypeName}
-                              onChange={(e) => setEditingTypeName(e.target.value)}
-                              className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleEditType}
-                              className="ml-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingTypeId(null)
-                                setEditingTypeName('')
-                              }}
-                              className="ml-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <span className="text-sm text-gray-700 dark:text-gray-200">{type.name}</span>
-                            <div className="flex items-center">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingTypeId(type.id || null)
-                                  setEditingTypeName(type.name)
-                                }}
-                                className="mr-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => type.id && handleDeleteType(type.id)}
-                                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <select
-                  name="type"
-                  value={formData.type}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  required
-                >
-                  <option value="">Select a type</option>
-                  {productTypes.map((type) => (
-                    <option key={type.id} value={type.name}>
-                      {type.name.charAt(0).toUpperCase() + type.name.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
+            {/* (Type field removed from UI; it is hardcoded in formData) */}
             {/* Raw Material Selection Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -679,10 +383,10 @@ export function ReceiveTeaCoffeeForm({
               />
             </div>
 
-            {/* Batch Number Field */}
+            {/* Batch Number Field (optional) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Batch Number *
+                Batch Number
               </label>
               <input
                 type="text"
@@ -690,14 +394,13 @@ export function ReceiveTeaCoffeeForm({
                 value={formData.batch_number}
                 onChange={handleChange}
                 className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                required
               />
             </div>
 
-            {/* Best Before Date Field */}
+            {/* Best Before Date Field (optional) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Best Before Date *
+                Best Before Date
               </label>
               <input
                 type="date"
@@ -705,7 +408,6 @@ export function ReceiveTeaCoffeeForm({
                 value={formData.best_before_date}
                 onChange={handleChange}
                 className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                required
               />
             </div>
 
@@ -726,22 +428,21 @@ export function ReceiveTeaCoffeeForm({
               />
             </div>
 
-            {/* Package Size Field (in grams) */}
+            {/* Package Size Field (in KG) – optional */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Package Size (grams) *
+                Package Size (KG)
               </label>
               <input
                 type="number"
                 name="package_size"
                 value={formData.package_size}
                 onChange={handleChange}
-                min="1"
-                step="1"
+                min="0"
+                step="0.01"
                 className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                required
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter package size in grams</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter package size in KG</p>
             </div>
 
             {/* Price per Unit Field */}
@@ -789,10 +490,10 @@ export function ReceiveTeaCoffeeForm({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Price per kg (£)
+                Price per KG (£)
               </label>
               <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 px-3 py-2 shadow-sm sm:text-sm text-gray-700 dark:text-gray-300">
-                £{pricePerKg.toFixed(2)}
+                {formData.package_size > 0 ? `£${pricePerKg.toFixed(2)}` : 'N/A'}
               </div>
             </div>
             <div>
