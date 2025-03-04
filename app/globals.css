@@ -4,14 +4,14 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 249, 250, 251;
+  --foreground-rgb: 0,0,0;
+  --background-rgb: 249,250,251;
 }
 
-/* Updated selector for dark mode */
-:root.dark {
-  --foreground-rgb: 255, 255, 255;
-  --background-rgb: 17, 24, 39;
+/* Use html.dark instead of :root.dark */
+html.dark {
+  --foreground-rgb: 255,255,255;
+  --background-rgb: 17,24,39;
 }
 
 html, body {
