@@ -1,5 +1,3 @@
-// components/layout/sidebar.tsx
-
 'use client'
 
 import { cn } from '@/lib/utils'
@@ -26,7 +24,10 @@ import {
   File,
   History,
   Award,
-  Trash2
+  Trash2,
+  Tool,
+  Wrench,
+  List
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -65,6 +66,13 @@ const navigation: NavItem[] = [
     ]
   },
   { 
+    name: 'Equipment & Maintenance', 
+    icon: Wrench,
+    submenu: [
+      { name: 'Equipment List', href: '/dashboard/equipment/list', icon: List },
+    ]
+  },
+  { 
     name: 'Compliance', 
     icon: FileText,
     submenu: [
@@ -88,7 +96,9 @@ export function Sidebar() {
     // Automatically expand Products menu if we're on a products page
     Products: pathname.includes('/dashboard/products'),
     // Also expand Traceability & Compliance menu if on a compliance page
-    'Traceability & Compliance': pathname.includes('/dashboard/compliance')
+    'Traceability & Compliance': pathname.includes('/dashboard/compliance'),
+    // Expand Equipment & Maintenance menu if on an equipment page
+    'Equipment & Maintenance': pathname.includes('/dashboard/equipment')
   })
 
   const handleSignOut = async () => {
