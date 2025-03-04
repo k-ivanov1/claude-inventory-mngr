@@ -12,13 +12,15 @@ export function ThemeToggle() {
       aria-label="Toggle Theme"
       className="relative flex items-center w-32 h-10 bg-gray-200 dark:bg-gray-800 rounded-full p-1 focus:outline-none shadow-md transition-colors duration-500"
     >
-      {/* Gradient overlay */}
+      {/* Gradient overlay for premium feel */}
       <div className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-r from-indigo-500 to-purple-500 opacity-30" />
 
-      {/* Slider circle */}
+      {/* Slider circle – bigger and repositioned to better cover the icons */}
       <div
-        className="absolute top-1/2 transform -translate-y-1/2 h-6 w-6 bg-white dark:bg-gray-900 rounded-full shadow-md transition-all duration-300"
-        style={{ left: theme === 'light' ? '0.25rem' : '6.25rem' }}
+        className="absolute top-1/2 transform -translate-y-1/2 h-7 w-7 bg-white dark:bg-gray-900 rounded-full shadow-md transition-all duration-300"
+        style={{
+          left: theme === 'light' ? '0.5rem' : 'calc(100% - 2.25rem)'
+        }}
       />
 
       {/* Icons */}
