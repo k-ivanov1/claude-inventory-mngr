@@ -9,7 +9,7 @@ interface RawMaterial {
   name: string
   unit: string
   current_stock?: number
-  unit_price?: number // Added unit price
+  unit_price?: number
 }
 
 interface RecipeItem {
@@ -20,7 +20,7 @@ interface RecipeItem {
   quantity: number
   unit?: string
   unit_cost?: number
-  total_cost?: number // Added total cost
+  total_cost?: number
 }
 
 interface Recipe {
@@ -28,7 +28,7 @@ interface Recipe {
   name: string
   description?: string
   items: RecipeItem[]
-  total_price?: number // Added total price for the entire recipe
+  total_price?: number
   is_active: boolean
 }
 
@@ -68,6 +68,7 @@ export function RecipeForm({
     fetchRawMaterials()
   }, [recipe])
 
+  // Updated fetchRawMaterials function to use average cost instead of unit price
   const fetchRawMaterials = async () => {
     try {
       // Get raw materials with their current inventory levels and prices
@@ -87,13 +88,36 @@ export function RecipeForm({
       
       if (inventoryError) throw inventoryError
       
-      // Combine data
+      // Get stock data for average cost calculation
+      const { data: stockData, error: stockError } = await supabase
+        .from('stock_tea_coffee')
+        .select('product_name, price_per_unit')
+        .eq('is_accepted', true)
+      
+      if (stockError) throw stockError
+      
+      // Combine data with average costs
       const materialsWithPricing = (materialsData || []).map(material => {
         const inventory = inventoryData?.find(inv => inv.item_id === material.id)
+        
+        // Calculate average cost
+        const materialStockEntries = stockData?.filter(entry => {
+          const rawMaterial = materialsData.find(m => m.id === material.id)
+          return entry.product_name === rawMaterial?.name
+        }) || []
+        
+        let averageCost = inventory?.unit_price || 0
+        if (materialStockEntries.length > 0) {
+          const totalCost = materialStockEntries.reduce((sum, entry) => 
+            sum + (entry.price_per_unit || 0), 0
+          )
+          averageCost = totalCost / materialStockEntries.length
+        }
+        
         return {
           ...material,
           current_stock: inventory?.current_stock || 0,
-          unit_price: inventory?.unit_price || 0
+          unit_price: averageCost  // Use average cost instead of unit price
         }
       })
       
@@ -186,17 +210,17 @@ export function RecipeForm({
     try {
       // Validate required fields
       if (!formData.name) {
-        throw new Error('Recipe name is required.');
+        throw new Error('Recipe name is required.')
       }
 
       if (formData.items.length === 0) {
-        throw new Error('Recipe must have at least one ingredient.');
+        throw new Error('Recipe must have at least one ingredient.')
       }
 
       // Validate each item has a material and quantity
-      const invalidItem = formData.items.find(item => !item.raw_material_id || item.quantity <= 0);
+      const invalidItem = formData.items.find(item => !item.raw_material_id || item.quantity <= 0)
       if (invalidItem) {
-        throw new Error('All ingredients must have a raw material and a positive quantity.');
+        throw new Error('All ingredients must have a raw material and a positive quantity.')
       }
 
       // Prepare recipe data
