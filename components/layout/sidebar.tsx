@@ -33,9 +33,8 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useState } from 'react'
-import { ThemeToggle } from '@/components/ui/ThemeToggle' // Import your dark/light mode toggle
+import { ThemeToggle } from '@/components/ThemeToggle'
 
-// Navigation item with optional submenu
 interface NavItem {
   name: string
   href?: string
@@ -92,11 +91,8 @@ export function Sidebar() {
   const supabase = createClientComponentClient()
   const { isOpen, toggle } = useSidebar()
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
-    // Automatically expand Products menu if we're on a products page
     Products: pathname.includes('/dashboard/products'),
-    // Also expand Traceability & Compliance menu if on a compliance page
     'Traceability & Compliance': pathname.includes('/dashboard/compliance'),
-    // Expand Equipment & Maintenance menu if on an equipment page
     'Equipment & Maintenance': pathname.includes('/dashboard/equipment')
   })
 
@@ -136,15 +132,14 @@ export function Sidebar() {
             <button
               onClick={() => toggleSubmenu(item.name)}
               className={cn(
-                'flex w-full items-center justify-between gap-x-3 rounded-lg px-3 py-2 text-sm font-medium hover:underline',
+                'flex w-full items-center justify-between gap-x-3 rounded-lg px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:border-current transition-all duration-300',
                 active
-                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-[20px]'
                   : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
               )}
             >
               <div className="flex items-center gap-x-3">
                 <item.icon className="h-5 w-5 shrink-0" />
-                {/* Added text-left to force left alignment */}
                 <span className={cn("transition-opacity duration-200 text-left", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
                   {item.name}
                 </span>
@@ -157,8 +152,6 @@ export function Sidebar() {
                 )}
               </div>
             </button>
-            
-           {/* Submenu items */}
             {isExpanded && item.submenu && (
               <div className="ml-6 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
                 {item.submenu.map(subItem => (
@@ -166,9 +159,9 @@ export function Sidebar() {
                     key={subItem.name}
                     href={subItem.href || '#'}
                     className={cn(
-                      'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium hover:underline',
+                      'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:border-current transition-all duration-300',
                       isActive(subItem.href)
-                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-[20px]'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                     )}
                   >
@@ -185,9 +178,9 @@ export function Sidebar() {
           <Link
             href={item.href || '#'}
             className={cn(
-              'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium hover:underline',
+              'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium border-b-2 border-transparent hover:border-current transition-all duration-300',
               active
-                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-[20px]'
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
             )}
           >
@@ -203,7 +196,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile backdrop */}
       {isOpen && (
         <div 
           className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden" 
@@ -211,7 +203,6 @@ export function Sidebar() {
         />
       )}
     
-      {/* Sidebar */}
       <div 
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-900 border-r dark:border-gray-700 transform transition-transform duration-300 ease-in-out lg:translate-x-0",
@@ -219,7 +210,7 @@ export function Sidebar() {
         )}
       >
         <div className="flex h-full flex-col">
-          {/* Sidebar header */}
+          {/* Header */}
           <div className="flex h-16 items-center justify-between border-b dark:border-gray-700 px-4">
             <h1 className="text-xl font-semibold dark:text-white">Tea Inventory</h1>
             <button 
@@ -235,13 +226,12 @@ export function Sidebar() {
             {navigation.map(renderNavItem)}
           </nav>
 
-          {/* Dark/Light mode toggle and Sign out button */}
-          <div className="border-t dark:border-gray-700 p-3 flex flex-col gap-2">
-            {/* Dark/Light toggle above sign out */}
+          {/* Bottom controls */}
+          <div className="border-t dark:border-gray-700 p-3 flex flex-col gap-4 items-center">
             <ThemeToggle />
             <button
               onClick={handleSignOut}
-              className="flex w-full items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
+              className="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-gray-800 transition-all duration-300"
             >
               <LogOut className="h-5 w-5 shrink-0" />
               <span className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
@@ -252,7 +242,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Toggle button for mobile */}
+      {/* Mobile toggle button */}
       <button
         onClick={toggle}
         className={cn(
