@@ -123,9 +123,10 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: ReceiveO
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type, checked } = e.target
+    const { name, value, type } = e.target
     if (type === 'checkbox') {
-      setFormData(prev => ({ ...prev, [name]: checked }))
+      const isChecked = (e.target as HTMLInputElement).checked
+      setFormData(prev => ({ ...prev, [name]: isChecked }))
     } else if (type === 'number') {
       setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 }))
     } else {
@@ -150,7 +151,7 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: ReceiveO
       if (updateError) throw updateError
     } catch (err: any) {
       console.error('Error updating raw material:', err)
-      // You may choose to setError here if needed
+      // Optionally setError here if needed
     }
   }
 
@@ -225,7 +226,7 @@ export function ReceiveOtherStockForm({ onClose, onSuccess, editItem }: ReceiveO
   }
 
   // Update or insert into inventory based on the received stock
-  // Note: We now use the "category" column (as used in your Tea/Coffee form)
+  // We now use the "category" column (as used in your Tea/Coffee form)
   const updateInventory = async (
     stockItem: Pick<OtherStock, 'product_name' | 'type' | 'supplier' | 'quantity' | 'price_per_unit'>
   ) => {
