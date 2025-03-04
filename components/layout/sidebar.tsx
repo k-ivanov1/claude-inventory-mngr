@@ -11,7 +11,6 @@ import {
   LogOut,
   PackageOpen,
   Clipboard,
-  Coffee,
   Truck,
   ChevronLeft,
   Menu,
@@ -34,6 +33,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useState } from 'react'
+import { ThemeToggle } from '@/components/ThemeToggle' // Import your dark/light mode toggle
 
 // Navigation item with optional submenu
 interface NavItem {
@@ -136,7 +136,7 @@ export function Sidebar() {
             <button
               onClick={() => toggleSubmenu(item.name)}
               className={cn(
-                'flex w-full items-center justify-between gap-x-3 rounded-lg px-3 py-2 text-sm font-medium',
+                'flex w-full items-center justify-between gap-x-3 rounded-lg px-3 py-2 text-sm font-medium hover:underline',
                 active
                   ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
                   : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
@@ -144,7 +144,8 @@ export function Sidebar() {
             >
               <div className="flex items-center gap-x-3">
                 <item.icon className="h-5 w-5 shrink-0" />
-                <span className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
+                {/* Added text-left to force left alignment */}
+                <span className={cn("transition-opacity duration-200 text-left", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
                   {item.name}
                 </span>
               </div>
@@ -165,14 +166,14 @@ export function Sidebar() {
                     key={subItem.name}
                     href={subItem.href || '#'}
                     className={cn(
-                      'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium',
+                      'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium hover:underline',
                       isActive(subItem.href)
                         ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                     )}
                   >
                     <subItem.icon className="h-4 w-4 shrink-0" />
-                    <span className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
+                    <span className={cn("transition-opacity duration-200 text-left", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
                       {subItem.name}
                     </span>
                   </Link>
@@ -184,14 +185,14 @@ export function Sidebar() {
           <Link
             href={item.href || '#'}
             className={cn(
-              'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium',
+              'flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium hover:underline',
               active
                 ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
             )}
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            <span className={cn("transition-opacity duration-200", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
+            <span className={cn("transition-opacity duration-200 text-left", isOpen ? "opacity-100" : "opacity-0 lg:opacity-100")}>
               {item.name}
             </span>
           </Link>
@@ -234,8 +235,10 @@ export function Sidebar() {
             {navigation.map(renderNavItem)}
           </nav>
 
-          {/* Sign out button */}
-          <div className="border-t dark:border-gray-700 p-3">
+          {/* Dark/Light mode toggle and Sign out button */}
+          <div className="border-t dark:border-gray-700 p-3 flex flex-col gap-2">
+            {/* Dark/Light toggle above sign out */}
+            <ThemeToggle />
             <button
               onClick={handleSignOut}
               className="flex w-full items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
