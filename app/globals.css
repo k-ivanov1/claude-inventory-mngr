@@ -8,7 +8,8 @@
   --background-rgb: 249, 250, 251;
 }
 
-.dark:root {
+/* Updated selector for dark mode */
+:root.dark {
   --foreground-rgb: 255, 255, 255;
   --background-rgb: 17, 24, 39;
 }
@@ -22,10 +23,10 @@ body {
   background-color: rgb(var(--background-rgb));
 }
 
-/* Add this rule to apply a gradient in dark mode */
-.dark body {
+/* Apply a custom dark gradient */
+html.dark body {
   background-image: linear-gradient(to top, #2a0a37, #1a1a1a);
-  background-color: transparent; /* Ensure the gradient shows */
+  background-color: transparent;
 }
 
 /* Ensure the app takes up at least the full viewport height */
