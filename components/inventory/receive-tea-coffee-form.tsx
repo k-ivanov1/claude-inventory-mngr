@@ -36,11 +36,12 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
   // State for approved suppliers
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
 
-  // Form data with type hardcoded and optional batch, best_before_date, and package_size.
+  // Form data with type hardcoded; batch_number, best_before_date and package_size are optional.
+  // Note: package_size is now in KG.
   const [formData, setFormData] = useState<TeaCoffeeStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
-    type: 'tea', // Hardcoded value; remove from UI
+    type: 'tea', // Hardcoded value; this is required in the DB
     supplier: '',
     invoice_number: '',
     batch_number: '',
@@ -138,7 +139,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     material.category.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Calculated fields (now package_size is in KG)
+  // Calculated fields (package_size is in KG)
   const totalKg = formData.quantity * formData.package_size
   const pricePerKg = formData.package_size > 0 
     ? formData.price_per_unit / formData.package_size
@@ -159,20 +160,24 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
       if (formData.quantity <= 0) throw new Error('Quantity must be greater than zero.')
       // Note: Batch number, best before date, and package size are now optional.
       
-      // Convert empty optional fields to null so they don't cause DB errors (especially for date)
+      // Ensure type is set; if empty, default to "tea"
+      const updatedFormData = { ...formData, type: formData.type || 'tea' }
+      
+      // Convert empty optional fields to null to avoid DB errors (especially for dates)
       const dataToSubmit = {
-        date: formData.date,
-        product_name: formData.product_name,
-        supplier: formData.supplier,
-        invoice_number: formData.invoice_number,
-        batch_number: formData.batch_number ? formData.batch_number : null,
-        best_before_date: formData.best_before_date ? formData.best_before_date : null,
-        quantity: formData.quantity,
-        price_per_unit: formData.price_per_unit,
-        package_size: formData.package_size ? formData.package_size : null,
-        is_damaged: formData.is_damaged,
-        is_accepted: formData.is_accepted,
-        checked_by: formData.checked_by,
+        date: updatedFormData.date,
+        product_name: updatedFormData.product_name,
+        type: updatedFormData.type,
+        supplier: updatedFormData.supplier,
+        invoice_number: updatedFormData.invoice_number,
+        batch_number: updatedFormData.batch_number ? updatedFormData.batch_number : null,
+        best_before_date: updatedFormData.best_before_date ? updatedFormData.best_before_date : null,
+        quantity: updatedFormData.quantity,
+        price_per_unit: updatedFormData.price_per_unit,
+        package_size: updatedFormData.package_size ? updatedFormData.package_size : null,
+        is_damaged: updatedFormData.is_damaged,
+        is_accepted: updatedFormData.is_accepted,
+        checked_by: updatedFormData.checked_by,
         total_kg: totalKg,
         price_per_kg: pricePerKg,
         total_cost: totalCost
@@ -192,7 +197,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
       
       if (result.error) throw result.error
       
-      await updateInventory(formData)
+      await updateInventory(updatedFormData)
       
       setSuccess('Stock received successfully')
       setTimeout(() => {
@@ -309,7 +314,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
                 required
               />
             </div>
-            {/* (Type field removed from UI; value remains in formData) */}
+            {/* (Type field removed from UI; value remains in formData and will default to "tea") */}
 
             {/* Raw Material Selection Field */}
             <div>
