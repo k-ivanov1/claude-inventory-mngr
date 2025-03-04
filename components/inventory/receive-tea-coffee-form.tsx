@@ -32,23 +32,22 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  // (Type management removed from UI. The type value is now hardcoded.)
+  // (Type management UI removed; type will be hardcoded.)
   // State for approved suppliers
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
 
-  // We no longer need a type selection.
-  // Set the default type to "tea" (you can change this in the future if needed)
+  // Form data with type hardcoded and optional batch, best_before_date, and package_size.
   const [formData, setFormData] = useState<TeaCoffeeStock>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
-    type: 'tea', // Default value, hidden from UI
+    type: 'tea', // Hardcoded value; remove from UI
     supplier: '',
     invoice_number: '',
-    batch_number: '',        // Not mandatory now
-    best_before_date: '',    // Not mandatory now
+    batch_number: '',
+    best_before_date: '',
     quantity: 0,
     price_per_unit: 0,
-    package_size: 0,         // Now in KG
+    package_size: 0, // Now in KG
     is_damaged: false,
     is_accepted: true,
     checked_by: '',
@@ -63,10 +62,8 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
 
   useEffect(() => {
     if (editItem) {
-      // When editing, load the existing data.
       setFormData({
         ...editItem,
-        // Ensure this flag is set
         labelling_matches_specifications: editItem.labelling_matches_specifications ?? true
       })
     }
@@ -141,7 +138,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     material.category.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Calculated fields (now using KG directly)
+  // Calculated fields (now package_size is in KG)
   const totalKg = formData.quantity * formData.package_size
   const pricePerKg = formData.package_size > 0 
     ? formData.price_per_unit / formData.package_size
@@ -157,15 +154,25 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     try {
       // Basic validations
       if (!formData.product_name) throw new Error('Please select a product.')
-      // We no longer validate type since it is hidden.
       if (!formData.supplier) throw new Error('Please select a supplier.')
       if (!formData.invoice_number) throw new Error('Invoice number is required.')
       if (formData.quantity <= 0) throw new Error('Quantity must be greater than zero.')
-      // Batch number, best before date and package size are now optional.
+      // Note: Batch number, best before date, and package size are now optional.
       
+      // Convert empty optional fields to null so they don't cause DB errors (especially for date)
       const dataToSubmit = {
-        ...formData,
-        // Calculated fields
+        date: formData.date,
+        product_name: formData.product_name,
+        supplier: formData.supplier,
+        invoice_number: formData.invoice_number,
+        batch_number: formData.batch_number ? formData.batch_number : null,
+        best_before_date: formData.best_before_date ? formData.best_before_date : null,
+        quantity: formData.quantity,
+        price_per_unit: formData.price_per_unit,
+        package_size: formData.package_size ? formData.package_size : null,
+        is_damaged: formData.is_damaged,
+        is_accepted: formData.is_accepted,
+        checked_by: formData.checked_by,
         total_kg: totalKg,
         price_per_kg: pricePerKg,
         total_cost: totalCost
@@ -241,7 +248,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
             unit_price: stockItem.price_per_unit,
             supplier: stockItem.supplier,
             reorder_point: 5,
-            unit: 'kg', // Now in KG
+            unit: 'kg', // Updated unit for KG
           })
       }
     } catch (err) {
@@ -302,7 +309,8 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
                 required
               />
             </div>
-            {/* (Type field removed from UI; it is hardcoded in formData) */}
+            {/* (Type field removed from UI; value remains in formData) */}
+
             {/* Raw Material Selection Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -428,7 +436,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
               />
             </div>
 
-            {/* Package Size Field (in KG) – optional */}
+            {/* Package Size Field (in KG; optional) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Package Size (KG)
