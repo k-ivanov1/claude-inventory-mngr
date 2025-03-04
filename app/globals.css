@@ -22,6 +22,12 @@ body {
   background-color: rgb(var(--background-rgb));
 }
 
+/* Add this rule to apply a gradient in dark mode */
+.dark body {
+  background-image: linear-gradient(to top, #2a0a37, #1a1a1a);
+  background-color: transparent; /* Ensure the gradient shows */
+}
+
 /* Ensure the app takes up at least the full viewport height */
 #__next, main {
   min-height: 100vh;
