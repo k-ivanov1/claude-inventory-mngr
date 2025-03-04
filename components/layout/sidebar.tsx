@@ -33,7 +33,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useState } from 'react'
-import { ThemeToggle } from '@/components/ThemeToggle'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 interface NavItem {
   name: string
