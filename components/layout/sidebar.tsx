@@ -79,6 +79,13 @@ const navigation: NavItem[] = [
       { name: 'Accreditations', href: '/dashboard/compliance/accreditations', icon: Award },
     ]
   },
+  {
+    name: 'Traceability',
+    icon: Clipboard,
+    submenu: [
+      { name: 'Batch Manufacturing Record', href: '/dashboard/traceability/batch-record', icon: FileText }
+    ]
+  },
   { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
   { name: 'Suppliers', href: '/dashboard/suppliers', icon: Truck },
   { name: 'Team', href: '/dashboard/team', icon: Users },
