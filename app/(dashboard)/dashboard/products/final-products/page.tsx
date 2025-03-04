@@ -5,10 +5,11 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Plus, Edit2, Trash2, Search } from 'lucide-react'
 import { FinalProductForm } from './final-product-form'
 
-// Updated Final Product interface
+// Updated Final Product interface with SKU field
 export interface FinalProduct {
   id?: string
   name: string
+  sku: string // Added SKU field
   recipe_id?: string
   recipe_name?: string
   category: string
@@ -45,7 +46,8 @@ export default function FinalProductsPage() {
     const filtered = finalProducts.filter(product =>
       product.name.toLowerCase().includes(term) ||
       product.category.toLowerCase().includes(term) ||
-      (product.recipe_name && product.recipe_name.toLowerCase().includes(term))
+      (product.recipe_name && product.recipe_name.toLowerCase().includes(term)) ||
+      (product.sku && product.sku.toLowerCase().includes(term)) // Added SKU to search filter
     )
     setFilteredProducts(filtered)
   }, [searchTerm, finalProducts])
@@ -165,6 +167,7 @@ export default function FinalProductsPage() {
       // Prepare data for submission
       const dataToSubmit = {
         name: productData.name,
+        sku: productData.sku, // Added SKU to the data submission
         category: productData.category,
         recipe_id: productData.recipe_id,
         is_active: productData.is_active ?? true,
@@ -245,7 +248,7 @@ export default function FinalProductsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Final Products</h2>
+<h2 className="text-2xl font-bold text-gray-900 dark:text-white">Final Products</h2>
           <p className="text-gray-600 dark:text-gray-300">Manage your finished products catalog</p>
         </div>
         <button
@@ -267,7 +270,7 @@ export default function FinalProductsPage() {
         </div>
         <input
           type="text"
-          placeholder="Search by name, recipe, or category..."
+          placeholder="Search by name, SKU, recipe, or category..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md leading-5 bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-100"
@@ -282,6 +285,9 @@ export default function FinalProductsPage() {
               <tr>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Name
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  SKU
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Recipe
@@ -315,13 +321,13 @@ export default function FinalProductsPage() {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  <td colSpan={11} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     Loading...
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  <td colSpan={11} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     No final products found.
                   </td>
                 </tr>
@@ -330,6 +336,9 @@ export default function FinalProductsPage() {
                   <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {product.name}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {product.sku || '-'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {product.recipe_name}
