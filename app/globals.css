@@ -25,7 +25,7 @@ body {
 
 /* Apply a custom dark gradient */
 html.dark body {
-  background-image: linear-gradient(to top, #2a0a37, #1a1a1a);
+  background: linear-gradient(to top, #2a0a37, #1a1a1a);
   background-color: transparent;
 }
 
