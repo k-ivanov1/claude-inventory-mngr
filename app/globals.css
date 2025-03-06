@@ -54,7 +54,7 @@
     --border: 270 40% 15%;
     --input: 270 40% 15%;
     --ring: 240 4.9% 83.9%;
-    --sidebar-background: 270 50% 10%;
+    --sidebar-background: 270, 50%, 10%;
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 270 70% 70%;
     --sidebar-primary-foreground: 222.2 47.4% 11.2%;
