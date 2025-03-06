@@ -2,143 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 222 47% 11%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96.1%;
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-    --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-  
-  .dark {
-    --background: 270 50% 10%; /* Dark purple base */
-    --foreground: 0 0% 98%;
-    --card: 270 50% 10%;
-    --card-foreground: 0 0% 98%;
-    --popover: 270 50% 10%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 270 40% 15%; 
-    --secondary-foreground: 0 0% 98%;
-    --muted: 270 40% 15%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 270 50% 30%; 
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 270 40% 15%;
-    --input: 270 40% 15%;
-    --ring: 240 4.9% 83.9%;
-    --sidebar-background: 270 50% 10%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 270 70% 70%;
-    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
-    --sidebar-accent: 270 40% 15%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 270 40% 15%;
-    --sidebar-ring: 240 4.9% 83.9%;
-  }
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 245, 245, 245;
+  --background-end-rgb: 255, 255, 255;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
-  
-  html {
-    @apply scroll-smooth antialiased;
-  }
+.dark:root {
+  /* change these for dark mode */
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 17, 17, 17;
+  --background-end-rgb: 34, 34, 34;
 }
 
-@layer utilities {
-  .glass-morphism {
-    @apply backdrop-blur-lg bg-white/10 border border-white/20;
-  }
-  
-  .dark .glass-morphism {
-    @apply bg-black/40 border-white/10;
-  }
-  
-  .dark body {
-    background: linear-gradient(to top, hsl(270, 50%, 10%) 0%, hsl(260, 15%, 8%) 100%);
-    background-attachment: fixed;
-  }
-  
-  .dark .sidebar-item:hover::after {
-    @apply bg-sidebar-primary;
-  }
-  
-  .dark .bg-sidebar-background {
-    background: linear-gradient(to top, hsl(270, 50%, 8%) 0%, hsl(260, 15%, 6%) 100%);
-    background-attachment: fixed;
-  }
-}
-
-/* Custom Sidebar Animation Classes */
-.sidebar-item {
-  @apply relative overflow-hidden transition-all duration-300 ease-in-out;
-}
-
-.sidebar-item-icon {
-  @apply transition-transform duration-300 ease-in-out;
-}
-
-.sidebar-item:hover .sidebar-item-icon {
-  @apply transform scale-110;
-}
-
-.sidebar-item-label {
-  @apply transition-opacity duration-300 ease-in-out;
-}
-
-.sidebar-item::after {
-  content: '';
-  @apply absolute bottom-0 left-0 h-[2px] w-0 bg-sidebar-primary transition-all duration-300 ease-in-out;
-}
-
-.sidebar-item:hover::after {
-  @apply w-full;
-}
-
-.theme-toggle {
-  @apply relative overflow-hidden transition-all duration-300 ease-in-out;
-}
-
-.theme-toggle::before {
-  content: '';
-  @apply absolute inset-0 -z-10 bg-sidebar-accent opacity-0 transition-opacity duration-300 ease-in-out rounded-full;
-}
-
-.theme-toggle:hover::before {
-  @apply opacity-100;
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
 }
