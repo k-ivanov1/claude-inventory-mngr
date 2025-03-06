@@ -48,8 +48,6 @@ module.exports = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
-      background: {
-        'dark-gradient': 'linear-gradient(to top, #2a0a37, #1a1a1a)', // dark purple at bottom to a modern dark shade at top
     },
   },
   plugins: [],
