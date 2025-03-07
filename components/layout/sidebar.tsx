@@ -82,7 +82,7 @@ const navigation: NavItem[] = [
   },
   {
     name: 'Traceability',
-    icon: Clipboard,
+    icon: ClipboardCheck,
     submenu: [
       { name: 'Batch Manufacturing Record', href: '/dashboard/traceability/batch-record', icon: FileText }
       { name: 'New Batch Record', href: '/dashboard/traceability', icon: FileText },
