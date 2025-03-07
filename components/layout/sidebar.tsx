@@ -25,6 +25,7 @@ import {
   Award,
   Trash2,
   Wrench,
+  ClipboardCheck,
   List
 } from 'lucide-react'
 import Link from 'next/link'
@@ -84,6 +85,8 @@ const navigation: NavItem[] = [
     icon: Clipboard,
     submenu: [
       { name: 'Batch Manufacturing Record', href: '/dashboard/traceability/batch-record', icon: FileText }
+      { name: 'New Batch Record', href: '/dashboard/traceability', icon: FileText },
+      { name: 'Batch Records', href: '/dashboard/traceability/batch-records', icon: FileText }
     ]
   },
   { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
