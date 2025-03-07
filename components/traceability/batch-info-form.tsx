@@ -9,6 +9,7 @@ interface BatchInfoFormProps {
   equipment: any[]
   rawMaterials: any[]
   batchNumbers: Record<string, string[]>
+  finalProducts: any[] // Add this line
 }
 
 export default function BatchInfoForm({
@@ -19,7 +20,8 @@ export default function BatchInfoForm({
   removeIngredient,
   equipment,
   rawMaterials,
-  batchNumbers
+  batchNumbers,
+  finalProducts // Destructure finalProducts
 }: BatchInfoFormProps) {
   return (
     <div className="space-y-8">
@@ -58,12 +60,11 @@ export default function BatchInfoForm({
             required
           >
             <option value="">Select a product</option>
-            {/* This would typically come from your final products table */}
-            <option value="product1">Earl Grey Tea</option>
-            <option value="product2">English Breakfast Tea</option>
-            <option value="product3">Green Tea with Jasmine</option>
-            <option value="product4">Ceylon Black Tea</option>
-            <option value="product5">Darjeeling Tea</option>
+            {finalProducts.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -228,7 +229,7 @@ export default function BatchInfoForm({
                   disabled={!ingredient.raw_material_id}
                 >
                   <option value="">Select batch number</option>
-                  {ingredient.raw_material_id && 
+                  {ingredient.raw_material_id &&
                     (batchNumbers[rawMaterials.find(m => m.id === ingredient.raw_material_id)?.name] || []).map((batchNumber: string) => (
                       <option key={batchNumber} value={batchNumber}>
                         {batchNumber}
