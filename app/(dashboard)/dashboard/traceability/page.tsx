@@ -26,6 +26,7 @@ export default function BatchRecordPage() {
   const [equipment, setEquipment] = useState<any[]>([])
   const [rawMaterials, setRawMaterials] = useState<any[]>([])
   const [batchNumbers, setBatchNumbers] = useState<Record<string, string[]>>({})
+  const [finalProducts, setFinalProducts] = useState<any[]>([]) // NEW state for final products
   
   // Form data state
   const [formData, setFormData] = useState({
@@ -33,7 +34,7 @@ export default function BatchRecordPage() {
     date: format(new Date(), 'yyyy-MM-dd'),
     product_id: '',
     batch_size: '',
-    batch_started: format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'),
+    batch_started: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     batch_finished: '',
     
     // Scale verification
@@ -90,6 +91,7 @@ export default function BatchRecordPage() {
   useEffect(() => {
     fetchEquipment()
     fetchRawMaterials()
+    fetchFinalProducts() // NEW: fetch final products on mount
   }, [])
 
   const fetchEquipment = async () => {
@@ -176,6 +178,23 @@ export default function BatchRecordPage() {
       setError('Failed to load batch numbers. Please try again.')
     }
   }
+  
+  const fetchFinalProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('final_products')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name')
+      
+      if (error) throw error
+      
+      setFinalProducts(data || [])
+    } catch (error: any) {
+      console.error('Error fetching final products:', error)
+      setError('Failed to load final products. Please try again.')
+    }
+  }
 
   const validateFirstStep = () => {
     // Check if all required fields in step 1 are filled
@@ -234,17 +253,11 @@ export default function BatchRecordPage() {
       [field]: value 
     }
     
-    // If raw_material_id changes, reset batch_number
+    // If raw_material_id changes, reset batch_number and update best before date if available
     if (field === 'raw_material_id') {
       updatedIngredients[index].batch_number = ''
-      
-      // Set best before date if available
       const rawMaterial = rawMaterials.find(m => m.id === value)
-      if (rawMaterial?.best_before_date) {
-        updatedIngredients[index].best_before_date = rawMaterial.best_before_date
-      } else {
-        updatedIngredients[index].best_before_date = ''
-      }
+      updatedIngredients[index].best_before_date = rawMaterial?.best_before_date || ''
     }
     
     setFormData({
@@ -457,6 +470,7 @@ export default function BatchRecordPage() {
                 equipment={equipment}
                 rawMaterials={rawMaterials}
                 batchNumbers={batchNumbers}
+                finalProducts={finalProducts}  {/* NEW: pass finalProducts */}
               />
             )}
             
