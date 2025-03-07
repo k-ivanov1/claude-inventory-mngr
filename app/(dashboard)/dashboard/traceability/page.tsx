@@ -259,11 +259,16 @@ export default function BatchRecordPage() {
     setLoading(true)
     setError(null)
     try {
+      // Convert string ID to integer if needed for product_id
+      const numericProductId = parseInt(formData.product_id)
+      const productId = isNaN(numericProductId) ? formData.product_id : numericProductId
+
+      // Create batch record
       const { data: batchData, error: batchError } = await supabase
         .from('batch_manufacturing_records')
         .insert({
           date: formData.date,
-          product_id: formData.product_id,
+          product_id: productId, // Use the converted ID
           batch_size: parseFloat(formData.batch_size),
           batch_started: formData.batch_started,
           batch_finished: formData.batch_finished,
