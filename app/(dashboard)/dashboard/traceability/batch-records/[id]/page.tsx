@@ -39,6 +39,7 @@ interface BatchRecord {
   remedial_actions?: string
   work_undertaken?: string
   created_at: string
+  scale_name?: string
 }
 
 interface BatchIngredient {
