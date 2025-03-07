@@ -26,31 +26,23 @@ export default function BatchRecordPage() {
   const [equipment, setEquipment] = useState<any[]>([])
   const [rawMaterials, setRawMaterials] = useState<any[]>([])
   const [batchNumbers, setBatchNumbers] = useState<Record<string, string[]>>({})
-  const [finalProducts, setFinalProducts] = useState<any[]>([]) // NEW state for final products
-  
-  // Form data state
+  const [finalProducts, setFinalProducts] = useState<any[]>([])
+
   const [formData, setFormData] = useState({
-    // General batch info
     date: format(new Date(), 'yyyy-MM-dd'),
     product_id: '',
     batch_size: '',
     batch_started: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     batch_finished: '',
-    
-    // Scale verification
     scale_id: '',
     scale_target_weight: '',
     scale_actual_reading: '',
-    
-    // Ingredients
-    ingredients: [{ 
-      raw_material_id: '', 
-      batch_number: '', 
-      best_before_date: '', 
-      quantity: '' 
+    ingredients: [{
+      raw_material_id: '',
+      batch_number: '',
+      best_before_date: '',
+      quantity: ''
     }],
-    
-    // Checklists
     equipment_clean: false,
     equipment_clean_initials: '',
     followed_gmp: false,
@@ -59,8 +51,6 @@ export default function BatchRecordPage() {
     bb_date_match_initials: '',
     label_compliance: false,
     label_compliance_initials: '',
-    
-    // Label checklist items
     product_name_accurate: false,
     ingredients_listed: false,
     net_quantity_displayed: false,
@@ -76,22 +66,18 @@ export default function BatchRecordPage() {
     text_clear: false,
     packaging_compliant: false,
     regulatory_compliant: false,
-    
-    // Notes for each checklist item
     checklist_notes: {} as Record<string, string>,
-    
-    // Manager section
     manager_comments: '',
     remedial_actions: '',
     work_undertaken: ''
   })
-  
+
   const supabase = createClientComponentClient()
 
   useEffect(() => {
     fetchEquipment()
     fetchRawMaterials()
-    fetchFinalProducts() // NEW: fetch final products on mount
+    fetchFinalProducts()
   }, [])
 
   const fetchEquipment = async () => {
@@ -101,22 +87,21 @@ export default function BatchRecordPage() {
         .select('*')
         .eq('status', 'active')
         .order('description')
-      
+
       if (error) throw error
-      
-      // Find the AZextra equipment and set it as default
-      const azextraEquipment = data?.find(item => 
-        item.description.toLowerCase().includes('azextra') || 
+
+      const azextraEquipment = data?.find(item =>
+        item.description.toLowerCase().includes('azextra') ||
         item.model?.toLowerCase().includes('azextra')
       )
-      
+
       if (azextraEquipment) {
         setFormData(prev => ({
           ...prev,
           scale_id: azextraEquipment.id
         }))
       }
-      
+
       setEquipment(data || [])
     } catch (error: any) {
       console.error('Error fetching equipment:', error)
@@ -131,14 +116,11 @@ export default function BatchRecordPage() {
         .select('*')
         .eq('is_active', true)
         .order('name')
-      
+
       if (error) throw error
-      
+
       setRawMaterials(data || [])
-      
-      // Fetch available batch numbers for each raw material
       await fetchBatchNumbers(data || [])
-      
     } catch (error: any) {
       console.error('Error fetching raw materials:', error)
       setError('Failed to load raw materials. Please try again.')
@@ -147,38 +129,31 @@ export default function BatchRecordPage() {
 
   const fetchBatchNumbers = async (materials: any[]) => {
     try {
-      // Get batch numbers from stock entries
       const { data, error } = await supabase
         .from('stock_tea_coffee')
         .select('*')
         .eq('is_accepted', true)
-      
+
       if (error) throw error
-      
-      // Organize batch numbers by product name
+
       const batchesByProduct: Record<string, string[]> = {}
-      
       data?.forEach(stock => {
         if (stock.batch_number && stock.product_name) {
           if (!batchesByProduct[stock.product_name]) {
             batchesByProduct[stock.product_name] = []
           }
-          
-          // Only add if it's not already in the array
           if (!batchesByProduct[stock.product_name].includes(stock.batch_number)) {
             batchesByProduct[stock.product_name].push(stock.batch_number)
           }
         }
       })
-      
       setBatchNumbers(batchesByProduct)
-      
     } catch (error: any) {
       console.error('Error fetching batch numbers:', error)
       setError('Failed to load batch numbers. Please try again.')
     }
   }
-  
+
   const fetchFinalProducts = async () => {
     try {
       const { data, error } = await supabase
@@ -186,9 +161,9 @@ export default function BatchRecordPage() {
         .select('id, name')
         .eq('is_active', true)
         .order('name')
-      
+
       if (error) throw error
-      
+
       setFinalProducts(data || [])
     } catch (error: any) {
       console.error('Error fetching final products:', error)
@@ -197,73 +172,57 @@ export default function BatchRecordPage() {
   }
 
   const validateFirstStep = () => {
-    // Check if all required fields in step 1 are filled
     if (!formData.product_id) return false
     if (!formData.batch_size) return false
     if (!formData.batch_started) return false
     if (!formData.scale_id) return false
     if (!formData.scale_target_weight) return false
     if (!formData.scale_actual_reading) return false
-    
-    // Check if at least one ingredient is properly filled
+
     const hasValidIngredient = formData.ingredients.some(
       ing => ing.raw_material_id && ing.quantity
     )
-    
     return hasValidIngredient
   }
 
   const handleNext = () => {
-    // Validate first step
     if (currentStep === 0 && !validateFirstStep()) {
       setError('Please fill all required fields before proceeding')
       return
     }
-    
-    setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1))
+    setCurrentStep(prev => Math.min(prev + 1, steps.length - 1))
     setError(null)
   }
 
   const handlePrevious = () => {
-    setCurrentStep((prev) => Math.max(prev - 1, 0))
+    setCurrentStep(prev => Math.max(prev - 1, 0))
     setError(null)
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     const { name, value, type } = e.target
-    
     if (type === 'checkbox') {
       const target = e.target as HTMLInputElement
-      setFormData({
-        ...formData,
-        [name]: target.checked
-      })
+      setFormData({ ...formData, [name]: target.checked })
     } else {
-      setFormData({
-        ...formData,
-        [name]: value
-      })
+      setFormData({ ...formData, [name]: value })
     }
   }
 
   const updateIngredient = (index: number, field: string, value: string) => {
     const updatedIngredients = [...formData.ingredients]
     updatedIngredients[index] = { 
-      ...updatedIngredients[index], 
-      [field]: value 
+      ...updatedIngredients[index],
+      [field]: value
     }
-    
-    // If raw_material_id changes, reset batch_number and update best before date if available
     if (field === 'raw_material_id') {
       updatedIngredients[index].batch_number = ''
       const rawMaterial = rawMaterials.find(m => m.id === value)
       updatedIngredients[index].best_before_date = rawMaterial?.best_before_date || ''
     }
-    
-    setFormData({
-      ...formData,
-      ingredients: updatedIngredients
-    })
+    setFormData({ ...formData, ingredients: updatedIngredients })
   }
 
   const addIngredient = () => {
@@ -279,16 +238,10 @@ export default function BatchRecordPage() {
   const removeIngredient = (index: number) => {
     const updatedIngredients = [...formData.ingredients]
     updatedIngredients.splice(index, 1)
-    
-    // Make sure we always have at least one ingredient
     if (updatedIngredients.length === 0) {
       updatedIngredients.push({ raw_material_id: '', batch_number: '', best_before_date: '', quantity: '' })
     }
-    
-    setFormData({
-      ...formData,
-      ingredients: updatedIngredients
-    })
+    setFormData({ ...formData, ingredients: updatedIngredients })
   }
 
   const updateChecklistNote = (checklistItem: string, note: string) => {
@@ -305,9 +258,7 @@ export default function BatchRecordPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    
     try {
-      // Create batch record
       const { data: batchData, error: batchError } = await supabase
         .from('batch_manufacturing_records')
         .insert({
@@ -319,7 +270,6 @@ export default function BatchRecordPage() {
           scale_id: formData.scale_id,
           scale_target_weight: parseFloat(formData.scale_target_weight),
           scale_actual_reading: parseFloat(formData.scale_actual_reading),
-          // Checklist data
           equipment_clean: formData.equipment_clean,
           equipment_clean_initials: formData.equipment_clean_initials,
           followed_gmp: formData.followed_gmp,
@@ -328,7 +278,6 @@ export default function BatchRecordPage() {
           bb_date_match_initials: formData.bb_date_match_initials,
           label_compliance: formData.label_compliance,
           label_compliance_initials: formData.label_compliance_initials,
-          // Label checklist
           product_name_accurate: formData.product_name_accurate,
           ingredients_listed: formData.ingredients_listed,
           net_quantity_displayed: formData.net_quantity_displayed,
@@ -344,20 +293,15 @@ export default function BatchRecordPage() {
           text_clear: formData.text_clear,
           packaging_compliant: formData.packaging_compliant,
           regulatory_compliant: formData.regulatory_compliant,
-          // Checklist notes as JSON
           checklist_notes: formData.checklist_notes,
-          // Manager section
           manager_comments: formData.manager_comments,
           remedial_actions: formData.remedial_actions,
           work_undertaken: formData.work_undertaken
         })
         .select('id')
-      
       if (batchError) throw batchError
-      
+
       const batchId = batchData?.[0]?.id
-      
-      // Add batch ingredients
       if (batchId) {
         const batchIngredients = formData.ingredients
           .filter(ing => ing.raw_material_id && ing.quantity)
@@ -368,21 +312,16 @@ export default function BatchRecordPage() {
             best_before_date: ing.best_before_date || null,
             quantity: parseFloat(ing.quantity)
           }))
-        
+
         const { error: ingredientsError } = await supabase
           .from('batch_ingredients')
           .insert(batchIngredients)
-        
         if (ingredientsError) throw ingredientsError
       }
-      
       setSuccess(true)
-      
-      // Reset form after successful submission
       setTimeout(() => {
         window.location.href = '/dashboard/traceability/batch-records'
       }, 2000)
-      
     } catch (error: any) {
       console.error('Error saving batch record:', error)
       setError(error.message || 'Failed to save batch record. Please try again.')
@@ -400,7 +339,7 @@ export default function BatchRecordPage() {
           Create a new batch manufacturing record for traceability
         </p>
       </div>
-      
+
       {/* Error message */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative" role="alert">
@@ -410,7 +349,7 @@ export default function BatchRecordPage() {
           </div>
         </div>
       )}
-      
+
       {/* Success message */}
       {success && (
         <div className="bg-green-50 dark:bg-green-900 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-200 px-4 py-3 rounded relative" role="alert">
@@ -420,7 +359,7 @@ export default function BatchRecordPage() {
           </div>
         </div>
       )}
-      
+
       {/* Steps */}
       <nav aria-label="Progress">
         <ol role="list" className="flex items-center">
@@ -454,14 +393,13 @@ export default function BatchRecordPage() {
           ))}
         </ol>
       </nav>
-      
+
       {/* Form */}
       <form onSubmit={handleSubmit}>
         <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
-          {/* Step content */}
           <div className="p-6">
-            {currentStep === 0 && (
-              <BatchInfoForm 
+            {currentStep === 0 ? (
+              <BatchInfoForm
                 formData={formData}
                 handleInputChange={handleInputChange}
                 updateIngredient={updateIngredient}
@@ -470,20 +408,16 @@ export default function BatchRecordPage() {
                 equipment={equipment}
                 rawMaterials={rawMaterials}
                 batchNumbers={batchNumbers}
-                finalProducts={finalProducts}  {/* NEW: pass finalProducts */}
+                finalProducts={finalProducts}
               />
-            )}
-            
-            {currentStep === 1 && (
-              <BatchChecklistForm 
+            ) : (
+              <BatchChecklistForm
                 formData={formData}
                 handleInputChange={handleInputChange}
                 updateChecklistNote={updateChecklistNote}
               />
             )}
           </div>
-          
-          {/* Form actions */}
           <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
@@ -497,7 +431,6 @@ export default function BatchRecordPage() {
             >
               Previous
             </button>
-            
             <div>
               {currentStep < steps.length - 1 ? (
                 <button
