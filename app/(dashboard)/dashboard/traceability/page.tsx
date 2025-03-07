@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { 
+import {
   CheckCircle2,
-  ChevronRight, 
+  ChevronRight,
   AlertTriangle,
   Scale,
   ClipboardCheck
@@ -28,21 +28,29 @@ export default function BatchRecordPage() {
   const [batchNumbers, setBatchNumbers] = useState<Record<string, string[]>>({})
   const [finalProducts, setFinalProducts] = useState<any[]>([])
 
+  // Updated formData to include new fields
   const [formData, setFormData] = useState({
+    // General batch info
     date: format(new Date(), 'yyyy-MM-dd'),
     product_id: '',
-    batch_size: '',
+    product_batch_number: '', // New field
+    product_best_before_date: '', // New field
+    bags_count: '0', // New field
+    kg_per_bag: '0', // New field
+    batch_size: '0',
     batch_started: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     batch_finished: '',
     scale_id: '',
     scale_target_weight: '',
     scale_actual_reading: '',
-    ingredients: [{
-      raw_material_id: '',
-      batch_number: '',
-      best_before_date: '',
-      quantity: ''
-    }],
+    ingredients: [
+      {
+        raw_material_id: '',
+        batch_number: '',
+        best_before_date: '',
+        quantity: ''
+      }
+    ],
     equipment_clean: false,
     equipment_clean_initials: '',
     followed_gmp: false,
@@ -213,7 +221,7 @@ export default function BatchRecordPage() {
 
   const updateIngredient = (index: number, field: string, value: string) => {
     const updatedIngredients = [...formData.ingredients]
-    updatedIngredients[index] = { 
+    updatedIngredients[index] = {
       ...updatedIngredients[index],
       [field]: value
     }
@@ -263,12 +271,16 @@ export default function BatchRecordPage() {
       const numericProductId = parseInt(formData.product_id)
       const productId = isNaN(numericProductId) ? formData.product_id : numericProductId
 
-      // Create batch record
+      // Create batch record with new fields included
       const { data: batchData, error: batchError } = await supabase
         .from('batch_manufacturing_records')
         .insert({
           date: formData.date,
-          product_id: productId, // Use the converted ID
+          product_id: productId,
+          product_batch_number: formData.product_batch_number,
+          product_best_before_date: formData.product_best_before_date,
+          bags_count: parseInt(formData.bags_count) || 0,
+          kg_per_bag: parseFloat(formData.kg_per_bag) || 0,
           batch_size: parseFloat(formData.batch_size),
           batch_started: formData.batch_started,
           batch_finished: formData.batch_finished,
@@ -429,8 +441,8 @@ export default function BatchRecordPage() {
               onClick={handlePrevious}
               disabled={currentStep === 0}
               className={`rounded-md px-3.5 py-2.5 text-sm font-semibold shadow-sm ${
-                currentStep === 0 
-                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                currentStep === 0
+                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                   : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
               }`}
             >
