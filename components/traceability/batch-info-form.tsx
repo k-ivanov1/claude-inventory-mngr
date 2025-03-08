@@ -1,477 +1,388 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import {
-  CheckCircle2,
-  ChevronRight,
-  AlertTriangle,
-  Scale,
-  ClipboardCheck
-} from 'lucide-react'
-import { format } from 'date-fns'
-import BatchInfoForm from '@/components/traceability/batch-info-form'
-import BatchChecklistForm from '@/components/traceability/batch-checklist-form'
+import React from 'react'
+import { Plus, Trash2 } from 'lucide-react'
 
-const steps = [
-  { id: 'batch-info', name: 'Batch Information', icon: Scale },
-  { id: 'checklist', name: 'Product Checklist', icon: ClipboardCheck },
-]
-
-export default function BatchRecordPage() {
-  const [currentStep, setCurrentStep] = useState(0)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [equipment, setEquipment] = useState<any[]>([])
-  const [rawMaterials, setRawMaterials] = useState<any[]>([])
-  const [batchNumbers, setBatchNumbers] = useState<Record<string, string[]>>({})
-  const [finalProducts, setFinalProducts] = useState<any[]>([])
-
-  // Updated formData: remove kg_per_bag and use bag_size instead.
-  const [formData, setFormData] = useState({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    product_id: '',
-    product_batch_number: '',
-    product_best_before_date: '',
-    bags_count: '0',
-    bag_size: '0',         // Updated field name
-    batch_size: '0',
-    batch_started: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-    batch_finished: '',
-    scale_id: '',
-    scale_target_weight: '',
-    scale_actual_reading: '',
-    ingredients: [
-      {
-        raw_material_id: '',
-        batch_number: '',
-        best_before_date: '',
-        quantity: ''
-      }
-    ],
-    equipment_clean: false,
-    equipment_clean_initials: '',
-    followed_gmp: false,
-    followed_gmp_initials: '',
-    bb_date_match: false,
-    bb_date_match_initials: '',
-    label_compliance: false,
-    label_compliance_initials: '',
-    product_name_accurate: false,
-    ingredients_listed: false,
-    net_quantity_displayed: false,
-    nutritional_info_present: false,
-    claims_verified: false,
-    manufacturer_info: false,
-    storage_conditions: false,
-    usage_instructions: false,
-    provenance_verified: false,
-    certifications_valid: false,
-    batch_code_applied: false,
-    artwork_correct: false,
-    text_clear: false,
-    packaging_compliant: false,
-    regulatory_compliant: false,
-    checklist_notes: {} as Record<string, string>,
-    manager_comments: '',
-    remedial_actions: '',
-    work_undertaken: ''
-  })
-
-  const supabase = createClientComponentClient()
-
-  useEffect(() => {
-    fetchEquipment()
-    fetchRawMaterials()
-    fetchFinalProducts()
-  }, [])
-
-  const fetchEquipment = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('equipment')
-        .select('*')
-        .eq('status', 'active')
-        .order('description')
-
-      if (error) throw error
-
-      const azextraEquipment = data?.find(item =>
-        item.description.toLowerCase().includes('azextra') ||
-        item.model?.toLowerCase().includes('azextra')
-      )
-
-      if (azextraEquipment) {
-        setFormData(prev => ({
-          ...prev,
-          scale_id: azextraEquipment.id
-        }))
-      }
-
-      setEquipment(data || [])
-    } catch (error: any) {
-      console.error('Error fetching equipment:', error)
-      setError('Failed to load equipment. Please try again.')
-    }
+export interface BatchInfoFormProps {
+  formData: {
+    date: string
+    product_id: string
+    product_batch_number: string
+    product_best_before_date: string
+    bags_count: string
+    bag_size: string
+    batch_size: string
+    batch_started: string
+    batch_finished: string
+    scale_id: string
+    scale_target_weight: string
+    scale_actual_reading: string
+    ingredients: {
+      raw_material_id: string
+      batch_number: string
+      best_before_date: string
+      quantity: string
+    }[]
+    equipment_clean: boolean
+    equipment_clean_initials: string
+    followed_gmp: boolean
+    followed_gmp_initials: string
+    bb_date_match: boolean
+    bb_date_match_initials: string
+    label_compliance: boolean
+    label_compliance_initials: string
+    product_name_accurate: boolean
+    ingredients_listed: boolean
+    net_quantity_displayed: boolean
+    nutritional_info_present: boolean
+    claims_verified: boolean
+    manufacturer_info: boolean
+    storage_conditions: boolean
+    usage_instructions: boolean
+    provenance_verified: boolean
+    certifications_valid: boolean
+    batch_code_applied: boolean
+    artwork_correct: boolean
+    text_clear: boolean
+    packaging_compliant: boolean
+    regulatory_compliant: boolean
+    checklist_notes: Record<string, string>
+    manager_comments: string
+    remedial_actions: string
+    work_undertaken: string
   }
-
-  const fetchRawMaterials = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('raw_materials')
-        .select('*')
-        .eq('is_active', true)
-        .order('name')
-
-      if (error) throw error
-
-      setRawMaterials(data || [])
-      await fetchBatchNumbers(data || [])
-    } catch (error: any) {
-      console.error('Error fetching raw materials:', error)
-      setError('Failed to load raw materials. Please try again.')
-    }
-  }
-
-  const fetchBatchNumbers = async (materials: any[]) => {
-    try {
-      const { data, error } = await supabase
-        .from('stock_tea_coffee')
-        .select('*')
-        .eq('is_accepted', true)
-
-      if (error) throw error
-
-      const batchesByProduct: Record<string, string[]> = {}
-      data?.forEach(stock => {
-        if (stock.batch_number && stock.product_name) {
-          if (!batchesByProduct[stock.product_name]) {
-            batchesByProduct[stock.product_name] = []
-          }
-          if (!batchesByProduct[stock.product_name].includes(stock.batch_number)) {
-            batchesByProduct[stock.product_name].push(stock.batch_number)
-          }
-        }
-      })
-      setBatchNumbers(batchesByProduct)
-    } catch (error: any) {
-      console.error('Error fetching batch numbers:', error)
-      setError('Failed to load batch numbers. Please try again.')
-    }
-  }
-
-  const fetchFinalProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('final_products')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name')
-
-      if (error) throw error
-
-      setFinalProducts(data || [])
-    } catch (error: any) {
-      console.error('Error fetching final products:', error)
-      setError('Failed to load final products. Please try again.')
-    }
-  }
-
-  const validateFirstStep = () => {
-    if (!formData.product_id) return false
-    if (!formData.batch_size) return false
-    if (!formData.batch_started) return false
-    if (!formData.scale_id) return false
-    if (!formData.scale_target_weight) return false
-    if (!formData.scale_actual_reading) return false
-
-    const hasValidIngredient = formData.ingredients.some(
-      ing => ing.raw_material_id && ing.quantity
-    )
-    return hasValidIngredient
-  }
-
-  const handleNext = () => {
-    if (currentStep === 0 && !validateFirstStep()) {
-      setError('Please fill all required fields before proceeding')
-      return
-    }
-    setCurrentStep(prev => Math.min(prev + 1, steps.length - 1))
-    setError(null)
-  }
-
-  const handlePrevious = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 0))
-    setError(null)
-  }
-
-  const handleInputChange = (
+  handleInputChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value, type } = e.target
-    if (type === 'checkbox') {
-      const target = e.target as HTMLInputElement
-      setFormData({ ...formData, [name]: target.checked })
-    } else {
-      setFormData({ ...formData, [name]: value })
-    }
+  ) => void
+  updateIngredient: (index: number, field: string, value: string) => void
+  addIngredient: () => void
+  removeIngredient: (index: number) => void
+  equipment: any[]
+  rawMaterials: any[]
+  batchNumbers: Record<string, string[]>
+  finalProducts: any[]
+}
+
+const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
+  formData,
+  handleInputChange,
+  updateIngredient,
+  addIngredient,
+  removeIngredient,
+  equipment,
+  rawMaterials,
+  batchNumbers,
+  finalProducts
+}) => {
+  // Calculate total batch size using bags_count and bag_size
+  const calculateTotalBatchSize = () => {
+    const bags = parseFloat(formData.bags_count) || 0
+    const bagSize = parseFloat(formData.bag_size) || 0
+    return (bags * bagSize).toFixed(2)
   }
 
-  const updateIngredient = (index: number, field: string, value: string) => {
-    const updatedIngredients = [...formData.ingredients]
-    updatedIngredients[index] = {
-      ...updatedIngredients[index],
-      [field]: value
-    }
-    if (field === 'raw_material_id') {
-      updatedIngredients[index].batch_number = ''
-      const rawMaterial = rawMaterials.find(m => m.id === value)
-      updatedIngredients[index].best_before_date = rawMaterial?.best_before_date || ''
-    }
-    setFormData({ ...formData, ingredients: updatedIngredients })
-  }
+  // When a batch number is changed for an ingredient, update the field and fetch best_before_date
+  const handleBatchNumberChange = async (index: number, batchNumber: string) => {
+    updateIngredient(index, 'batch_number', batchNumber)
+    const ingredient = formData.ingredients[index]
+    const rawMaterialId = ingredient.raw_material_id
+    if (!rawMaterialId || !batchNumber) return
 
-  const addIngredient = () => {
-    setFormData({
-      ...formData,
-      ingredients: [
-        ...formData.ingredients,
-        { raw_material_id: '', batch_number: '', best_before_date: '', quantity: '' }
-      ]
-    })
-  }
-
-  const removeIngredient = (index: number) => {
-    const updatedIngredients = [...formData.ingredients]
-    updatedIngredients.splice(index, 1)
-    if (updatedIngredients.length === 0) {
-      updatedIngredients.push({ raw_material_id: '', batch_number: '', best_before_date: '', quantity: '' })
-    }
-    setFormData({ ...formData, ingredients: updatedIngredients })
-  }
-
-  const updateChecklistNote = (checklistItem: string, note: string) => {
-    setFormData({
-      ...formData,
-      checklist_notes: {
-        ...formData.checklist_notes,
-        [checklistItem]: note
-      }
-    })
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    try {
-      // Convert string ID to integer if needed for product_id
-      const numericProductId = parseInt(formData.product_id)
-      const productId = isNaN(numericProductId) ? formData.product_id : numericProductId
-
-      // Create batch record with updated field names.
-      const { data: batchData, error: batchError } = await supabase
-        .from('batch_manufacturing_records')
-        .insert({
-          date: formData.date,
-          product_id: productId,
-          product_batch_number: formData.product_batch_number,
-          product_best_before_date: formData.product_best_before_date,
-          bags_count: parseInt(formData.bags_count) || 0,
-          // Use bag_size (not kg_per_bag) to match the schema.
-          bag_size: parseFloat(formData.bag_size) || 0,
-          batch_size: parseFloat(formData.batch_size),
-          batch_started: formData.batch_started,
-          batch_finished: formData.batch_finished,
-          scale_id: formData.scale_id,
-          scale_target_weight: parseFloat(formData.scale_target_weight),
-          scale_actual_reading: parseFloat(formData.scale_actual_reading),
-          equipment_clean: formData.equipment_clean,
-          equipment_clean_initials: formData.equipment_clean_initials,
-          followed_gmp: formData.followed_gmp,
-          followed_gmp_initials: formData.followed_gmp_initials,
-          bb_date_match: formData.bb_date_match,
-          bb_date_match_initials: formData.bb_date_match_initials,
-          label_compliance: formData.label_compliance,
-          label_compliance_initials: formData.label_compliance_initials,
-          product_name_accurate: formData.product_name_accurate,
-          ingredients_listed: formData.ingredients_listed,
-          net_quantity_displayed: formData.net_quantity_displayed,
-          nutritional_info_present: formData.nutritional_info_present,
-          claims_verified: formData.claims_verified,
-          manufacturer_info: formData.manufacturer_info,
-          storage_conditions: formData.storage_conditions,
-          usage_instructions: formData.usage_instructions,
-          provenance_verified: formData.provenance_verified,
-          certifications_valid: formData.certifications_valid,
-          batch_code_applied: formData.batch_code_applied,
-          artwork_correct: formData.artwork_correct,
-          text_clear: formData.text_clear,
-          packaging_compliant: formData.packaging_compliant,
-          regulatory_compliant: formData.regulatory_compliant,
-          checklist_notes: formData.checklist_notes,
-          manager_comments: formData.manager_comments,
-          remedial_actions: formData.remedial_actions,
-          work_undertaken: formData.work_undertaken
-        })
-        .select('id')
-      if (batchError) throw batchError
-
-      const batchId = batchData?.[0]?.id
-      if (batchId) {
-        const batchIngredients = formData.ingredients
-          .filter(ing => ing.raw_material_id && ing.quantity)
-          .map(ing => ({
-            batch_id: batchId,
-            raw_material_id: ing.raw_material_id,
-            batch_number: ing.batch_number || null,
-            best_before_date: ing.best_before_date || null,
-            quantity: parseFloat(ing.quantity)
-          }))
-
-        const { error: ingredientsError } = await supabase
-          .from('batch_ingredients')
-          .insert(batchIngredients)
-        if (ingredientsError) throw ingredientsError
-      }
-      setSuccess(true)
-      setTimeout(() => {
-        window.location.href = '/dashboard/traceability/batch-records'
-      }, 2000)
-    } catch (error: any) {
-      console.error('Error saving batch record:', error)
-      setError(error.message || 'Failed to save batch record. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    // Example: query your 'stock_receiving' table for best_before_date.
+    // Adjust the query as needed for your schema.
+    // Here we assume you have an imported supabase client.
+    // For example:
+    // const { data, error } = await supabase
+    //   .from('stock_receiving')
+    //   .select('best_before_date')
+    //   .eq('raw_material_id', rawMaterialId)
+    //   .eq('batch_number', batchNumber)
+    //   .single()
+    // if (!error && data) {
+    //   updateIngredient(index, 'best_before_date', data.best_before_date)
+    // }
   }
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Batch Manufacturing Record</h2>
-        <p className="text-gray-600 dark:text-gray-300">
-          Create a new batch manufacturing record for traceability
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Batch Information</h3>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          Enter the general information about this batch.
         </p>
       </div>
-
-      {/* Error message */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative" role="alert">
-          <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            <span className="block sm:inline">{error}</span>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Date */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Date *</label>
+          <input
+            type="date"
+            name="date"
+            value={formData.date}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            required
+          />
         </div>
-      )}
-
-      {/* Success message */}
-      {success && (
-        <div className="bg-green-50 dark:bg-green-900 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-200 px-4 py-3 rounded relative" role="alert">
-          <div className="flex items-center">
-            <CheckCircle2 className="h-5 w-5 mr-2" />
-            <span className="block sm:inline">Batch record saved successfully!</span>
-          </div>
+        {/* Product Dropdown */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product *</label>
+          <select
+            name="product_id"
+            value={formData.product_id}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            required
+          >
+            <option value="">Select a product</option>
+            {finalProducts?.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
+        {/* Product Batch Number */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Batch Number *</label>
+          <input
+            type="text"
+            name="product_batch_number"
+            value={formData.product_batch_number}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            required
+          />
+        </div>
+        {/* Product Best Before Date */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Best Before Date *</label>
+          <input
+            type="date"
+            name="product_best_before_date"
+            value={formData.product_best_before_date}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            required
+          />
+        </div>
+        {/* Number of Bags */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Bags *</label>
+          <input
+            type="number"
+            name="bags_count"
+            value={formData.bags_count}
+            onChange={handleInputChange}
+            step="1"
+            min="0"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            required
+          />
+        </div>
+        {/* Kilograms per Bag (using bag_size) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Kilograms per Bag *</label>
+          <input
+            type="number"
+            name="bag_size"
+            value={formData.bag_size}
+            onChange={handleInputChange}
+            step="0.001"
+            min="0"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            required
+          />
+        </div>
+        {/* Total Batch Size (calculated) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Batch Size (kg)</label>
+          <input
+            type="number"
+            name="batch_size"
+            value={calculateTotalBatchSize()}
+            readOnly
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-gray-100"
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Calculated: {formData.bags_count || 0} bags x {formData.bag_size || 0} kg = {calculateTotalBatchSize()} kg
+          </p>
+        </div>
+        {/* Batch Started (Date & Time) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Batch Started (Date & Time) *</label>
+          <input
+            type="datetime-local"
+            name="batch_started"
+            value={formData.batch_started}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            required
+          />
+        </div>
+        {/* Batch Finished (Date & Time) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Batch Finished (Date & Time)</label>
+          <input
+            type="datetime-local"
+            name="batch_finished"
+            value={formData.batch_finished}
+            onChange={handleInputChange}
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          />
+        </div>
+      </div>
 
-      {/* Steps */}
-      <nav aria-label="Progress">
-        <ol role="list" className="flex items-center">
-          {steps.map((step, index) => (
-            <li key={step.id} className={`relative ${index !== steps.length - 1 ? 'pr-8 sm:pr-20' : ''}`}>
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                {index !== steps.length - 1 && (
-                  <div className={`h-0.5 w-full ${currentStep > index ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
-                )}
-              </div>
-              <div 
-                className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentStep > index 
-                    ? 'bg-indigo-600 dark:bg-indigo-400' 
-                    : currentStep === index 
-                    ? 'bg-indigo-600 dark:bg-indigo-400' 
-                    : 'bg-gray-200 dark:bg-gray-700'
-                }`}
-              >
-                {currentStep > index ? (
-                  <CheckCircle2 className="h-5 w-5 text-white" aria-hidden="true" />
-                ) : (
-                  <step.icon className="h-5 w-5 text-white" aria-hidden="true" />
-                )}
-                <span className="sr-only">{step.name}</span>
-              </div>
-              <div className="mt-2 hidden sm:block">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{step.name}</span>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </nav>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit}>
-        <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
-          <div className="p-6">
-            {currentStep === 0 ? (
-              <BatchInfoForm
-                formData={formData}
-                handleInputChange={handleInputChange}
-                updateIngredient={updateIngredient}
-                addIngredient={addIngredient}
-                removeIngredient={removeIngredient}
-                equipment={equipment}
-                rawMaterials={rawMaterials}
-                batchNumbers={batchNumbers}
-                finalProducts={finalProducts}
-              />
-            ) : (
-              <BatchChecklistForm
-                formData={formData}
-                handleInputChange={handleInputChange}
-                updateChecklistNote={updateChecklistNote}
-              />
-            )}
-          </div>
-          <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-              className={`rounded-md px-3.5 py-2.5 text-sm font-semibold shadow-sm ${
-                currentStep === 0
-                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                  : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
-              }`}
+      {/* Scale Verification Section */}
+      <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Scale Verification</h3>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Verify the scale used for this batch.</p>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Scale Equipment *</label>
+            <select
+              name="scale_id"
+              value={formData.scale_id}
+              onChange={handleInputChange}
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              required
             >
-              Previous
-            </button>
-            <div>
-              {currentStep < steps.length - 1 ? (
+              <option value="">Select scale</option>
+              {equipment.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.description} {item.model ? `(${item.model})` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Default: AZextra scale</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Scale Target Weight (g) *</label>
+            <input
+              type="number"
+              name="scale_target_weight"
+              value={formData.scale_target_weight}
+              onChange={handleInputChange}
+              step="0.001"
+              min="0"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Actual Reading (g) *</label>
+            <input
+              type="number"
+              name="scale_actual_reading"
+              value={formData.scale_actual_reading}
+              onChange={handleInputChange}
+              step="0.001"
+              min="0"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              required
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Ingredients Section */}
+      <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Ingredients</h3>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Add ingredients used in this batch.</p>
+          </div>
+          <button
+            type="button"
+            onClick={addIngredient}
+            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add Ingredient
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          {formData.ingredients.map((ingredient: any, index: number) => (
+            <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-4 border border-gray-200 dark:border-gray-700 rounded-md">
+              <div className="md:col-span-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Raw Material *</label>
+                <select
+                  value={ingredient.raw_material_id}
+                  onChange={(e) => updateIngredient(index, 'raw_material_id', e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  required
+                >
+                  <option value="">Select raw material</option>
+                  {rawMaterials.map((material) => (
+                    <option key={material.id} value={material.id}>
+                      {material.name} ({material.unit})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Batch Number</label>
+                <select
+                  value={ingredient.batch_number}
+                  onChange={(e) => {
+                    // When selecting a batch number, trigger best before date retrieval.
+                    handleBatchNumberChange(index, e.target.value)
+                  }}
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  disabled={!ingredient.raw_material_id}
+                >
+                  <option value="">Select batch number</option>
+                  {ingredient.raw_material_id &&
+                    (batchNumbers[rawMaterials.find(m => m.id === ingredient.raw_material_id)?.name] || []).map((batchNumber: string) => (
+                      <option key={batchNumber} value={batchNumber}>
+                        {batchNumber}
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Best Before Date</label>
+                <input
+                  type="date"
+                  value={ingredient.best_before_date || ''}
+                  onChange={(e) => updateIngredient(index, 'best_before_date', e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Quantity *</label>
+                <input
+                  type="number"
+                  value={ingredient.quantity}
+                  onChange={(e) => updateIngredient(index, 'quantity', e.target.value)}
+                  step="0.001"
+                  min="0"
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-1 flex justify-end">
                 <button
                   type="button"
-                  onClick={handleNext}
-                  className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+                  onClick={() => removeIngredient(index)}
+                  className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                  title="Remove ingredient"
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
+                  <Trash2 className="h-5 w-5" />
                 </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
-                >
-                  {loading ? 'Saving...' : 'Save Batch Record'}
-                </button>
-              )}
+              </div>
             </div>
-          </div>
+          ))}
         </div>
-      </form>
+      </div>
     </div>
   )
 }
+
+export default BatchInfoForm
