@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import {
   CheckCircle2,
@@ -28,7 +29,7 @@ export default function BatchRecordPage() {
   const [batchNumbers, setBatchNumbers] = useState<Record<string, string[]>>({})
   const [finalProducts, setFinalProducts] = useState<any[]>([])
 
-  // Updated formData to include new fields
+  // Updated formData: replaced kg_per_bag with bag_size
   const [formData, setFormData] = useState({
     // General batch info
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -36,7 +37,7 @@ export default function BatchRecordPage() {
     product_batch_number: '', // New field
     product_best_before_date: '', // New field
     bags_count: '0', // New field
-    kg_per_bag: '0', // New field
+    bag_size: '0',   // <-- updated here (previously kg_per_bag)
     batch_size: '0',
     batch_started: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     batch_finished: '',
@@ -271,7 +272,7 @@ export default function BatchRecordPage() {
       const numericProductId = parseInt(formData.product_id)
       const productId = isNaN(numericProductId) ? formData.product_id : numericProductId
 
-      // Create batch record with new fields included
+      // Create batch record with updated field names.
       const { data: batchData, error: batchError } = await supabase
         .from('batch_manufacturing_records')
         .insert({
@@ -280,7 +281,8 @@ export default function BatchRecordPage() {
           product_batch_number: formData.product_batch_number,
           product_best_before_date: formData.product_best_before_date,
           bags_count: parseInt(formData.bags_count) || 0,
-          kg_per_bag: parseFloat(formData.kg_per_bag) || 0,
+          // UPDATED: Use bag_size (not kg_per_bag) to match the schema.
+          bag_size: parseFloat(formData.bag_size) || 0,
           batch_size: parseFloat(formData.batch_size),
           batch_started: formData.batch_started,
           batch_finished: formData.batch_finished,
