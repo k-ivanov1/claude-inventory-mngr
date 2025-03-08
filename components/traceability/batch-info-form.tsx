@@ -103,57 +103,55 @@ export default function BatchInfoForm({
             required
           />
         </div>
-
-{/* Number of Bags */}
-<div>
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Number of Bags *
-  </label>
-  <input
-    type="number"
-    name="bags_count"
-    value={formData.bags_count}
-    onChange={handleInputChange}  // Removed the synthetic event update here
-    step="1"
-    min="0"
-    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-    required
-  />
-</div>
-        {/* Kilograms per Bag */}
-<div>
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Kilograms per Bag *
-  </label>
-  <input
-    type="number"
-    name="bag_size"
-    value={formData.bag_size}
-    onChange={handleInputChange}  // Also simplified here
-    step="0.001"
-    min="0"
-    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-    required
-  />
-</div>
+        {/* Number of Bags */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Number of Bags *
+          </label>
+          <input
+            type="number"
+            name="bags_count"
+            value={formData.bags_count}
+            onChange={handleInputChange}
+            step="1"
+            min="0"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            required
+          />
+        </div>
+        {/* Kilograms per Bag (using bag_size) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Kilograms per Bag *
+          </label>
+          <input
+            type="number"
+            name="bag_size"
+            value={formData.bag_size}
+            onChange={handleInputChange}
+            step="0.001"
+            min="0"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            required
+          />
+        </div>
         {/* Total Batch Size (calculated) */}
-<div>
-  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-    Total Batch Size (kg)
-  </label>
-  <input
-    type="number"
-    name="batch_size"
-    value={formData.batch_size}
-    onChange={handleInputChange}
-    readOnly
-    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-gray-100"
-  />
-  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-    Calculated: {formData.bags_count || 0} bags x {formData.bag_size || 0} kg = {calculateTotalBatchSize()} kg
-  </p>
-</div>
-
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Total Batch Size (kg)
+          </label>
+          <input
+            type="number"
+            name="batch_size"
+            value={formData.batch_size}
+            onChange={handleInputChange}
+            readOnly
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-gray-100"
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Calculated: {formData.bags_count || 0} bags x {formData.bag_size || 0} kg = {calculateTotalBatchSize()} kg
+          </p>
+        </div>
         {/* Batch Started (Date & Time) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
