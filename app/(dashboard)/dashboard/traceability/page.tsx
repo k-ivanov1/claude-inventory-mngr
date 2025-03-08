@@ -29,15 +29,14 @@ export default function BatchRecordPage() {
   const [batchNumbers, setBatchNumbers] = useState<Record<string, string[]>>({})
   const [finalProducts, setFinalProducts] = useState<any[]>([])
 
-  // Updated formData: replaced kg_per_bag with bag_size
+  // UPDATED: Removed the kg_per_bag field; now using only bag_size
   const [formData, setFormData] = useState({
-    // General batch info
     date: format(new Date(), 'yyyy-MM-dd'),
     product_id: '',
-    product_batch_number: '', // New field
-    product_best_before_date: '', // New field
-    bags_count: '0', // New field
-    bag_size: '0',   // <-- updated here (previously kg_per_bag)
+    product_batch_number: '',
+    product_best_before_date: '',
+    bags_count: '0',
+    bag_size: '0', // Use this field for "kilograms per bag"
     batch_size: '0',
     batch_started: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     batch_finished: '',
@@ -268,7 +267,6 @@ export default function BatchRecordPage() {
     setLoading(true)
     setError(null)
     try {
-      // Convert string ID to integer if needed for product_id
       const numericProductId = parseInt(formData.product_id)
       const productId = isNaN(numericProductId) ? formData.product_id : numericProductId
 
@@ -281,7 +279,7 @@ export default function BatchRecordPage() {
           product_batch_number: formData.product_batch_number,
           product_best_before_date: formData.product_best_before_date,
           bags_count: parseInt(formData.bags_count) || 0,
-          // UPDATED: Use bag_size (not kg_per_bag) to match the schema.
+          // UPDATED: Use bag_size field
           bag_size: parseFloat(formData.bag_size) || 0,
           batch_size: parseFloat(formData.batch_size),
           batch_started: formData.batch_started,
