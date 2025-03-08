@@ -23,11 +23,11 @@ export default function BatchInfoForm({
   batchNumbers,
   finalProducts
 }: BatchInfoFormProps) {
-  // Calculate total batch size based on bags count and kg per bag.
+  // Calculate total batch size based on bags_count and bag_size.
   const calculateTotalBatchSize = () => {
     const bags = parseFloat(formData.bags_count) || 0;
-    const kgPerBag = parseFloat(formData.kg_per_bag) || 0;
-    return (bags * kgPerBag).toFixed(2);
+    const bagSize = parseFloat(formData.bag_size) || 0;
+    return (bags * bagSize).toFixed(2);
   };
 
   return (
@@ -75,7 +75,7 @@ export default function BatchInfoForm({
             ))}
           </select>
         </div>
-        {/* New: Product Batch Number */}
+        {/* Product Batch Number */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Product Batch Number *
@@ -89,7 +89,7 @@ export default function BatchInfoForm({
             required
           />
         </div>
-        {/* New: Product Best Before Date */}
+        {/* Product Best Before Date */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Best Before Date *
@@ -103,7 +103,7 @@ export default function BatchInfoForm({
             required
           />
         </div>
-        {/* New: Number of Bags */}
+        {/* Number of Bags */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Number of Bags *
@@ -114,10 +114,9 @@ export default function BatchInfoForm({
             value={formData.bags_count}
             onChange={(e) => {
               handleInputChange(e);
-              // Automatically update batch_size when bags_count changes.
               const bags = parseFloat(e.target.value) || 0;
-              const kgPerBag = parseFloat(formData.kg_per_bag) || 0;
-              const batchSize = (bags * kgPerBag).toString();
+              const bagSize = parseFloat(formData.bag_size) || 0;
+              const batchSize = (bags * bagSize).toString();
               const syntheticEvent = {
                 target: { name: 'batch_size', value: batchSize, type: 'number' }
               } as React.ChangeEvent<HTMLInputElement>;
@@ -129,21 +128,20 @@ export default function BatchInfoForm({
             required
           />
         </div>
-        {/* New: Kilograms per Bag */}
+        {/* Kilograms per Bag (renamed to bag_size) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Kilograms per Bag *
           </label>
           <input
             type="number"
-            name="kg_per_bag"
-            value={formData.kg_per_bag}
+            name="bag_size"
+            value={formData.bag_size}
             onChange={(e) => {
               handleInputChange(e);
-              // Automatically update batch_size when kg_per_bag changes.
-              const kgPerBag = parseFloat(e.target.value) || 0;
+              const bagSize = parseFloat(e.target.value) || 0;
               const bags = parseFloat(formData.bags_count) || 0;
-              const batchSize = (bags * kgPerBag).toString();
+              const batchSize = (bags * bagSize).toString();
               const syntheticEvent = {
                 target: { name: 'batch_size', value: batchSize, type: 'number' }
               } as React.ChangeEvent<HTMLInputElement>;
@@ -155,7 +153,7 @@ export default function BatchInfoForm({
             required
           />
         </div>
-        {/* New: Total Batch Size (calculated) */}
+        {/* Total Batch Size (calculated) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Total Batch Size (kg)
@@ -169,10 +167,10 @@ export default function BatchInfoForm({
             className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-gray-100"
           />
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Calculated: {formData.bags_count || 0} bags x {formData.kg_per_bag || 0} kg = {calculateTotalBatchSize()} kg
+            Calculated: {formData.bags_count || 0} bags x {formData.bag_size || 0} kg = {calculateTotalBatchSize()} kg
           </p>
         </div>
-        {/* Existing Time Fields */}
+        {/* Batch Started (Date & Time) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Batch Started (Date & Time) *
@@ -186,6 +184,7 @@ export default function BatchInfoForm({
             required
           />
         </div>
+        {/* Batch Finished (Date & Time) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Batch Finished (Date & Time)
