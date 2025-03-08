@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient' // adjust the import path as needed
 
 interface BatchInfoFormProps {
   formData: any
@@ -9,7 +10,7 @@ interface BatchInfoFormProps {
   equipment: any[]
   rawMaterials: any[]
   batchNumbers: Record<string, string[]>
-  finalProducts: any[] // New prop for final products
+  finalProducts: any[]
 }
 
 export default function BatchInfoForm({
@@ -23,11 +24,38 @@ export default function BatchInfoForm({
   batchNumbers,
   finalProducts
 }: BatchInfoFormProps) {
-  // Calculate total batch size based on bags_count and bag_size.
+  // Calculate total batch size using bags_count and bag_size (note: using bag_size, not kg_per_bag)
   const calculateTotalBatchSize = () => {
     const bags = parseFloat(formData.bags_count) || 0;
     const bagSize = parseFloat(formData.bag_size) || 0;
     return (bags * bagSize).toFixed(2);
+  };
+
+  // When a batch number is changed for an ingredient, update the field and fetch best_before_date
+  const handleBatchNumberChange = async (index: number, batchNumber: string) => {
+    // Update the ingredient's batch number
+    updateIngredient(index, 'batch_number', batchNumber);
+    // Get the raw material id for this ingredient
+    const ingredient = formData.ingredients[index];
+    const rawMaterialId = ingredient.raw_material_id;
+    if (!rawMaterialId || !batchNumber) return;
+    
+    // Query the stock_receiving table for best_before_date based on raw_material_id and batch number.
+    // Adjust the query fields/conditions to match your table structure.
+    const { data, error } = await supabase
+      .from('stock_receiving')
+      .select('best_before_date')
+      .eq('raw_material_id', rawMaterialId)
+      .eq('batch_number', batchNumber)
+      .single();
+      
+    if (error) {
+      console.error('Error fetching best before date:', error);
+      return;
+    }
+    
+    // Update the ingredient best_before_date field with the fetched value.
+    updateIngredient(index, 'best_before_date', data.best_before_date);
   };
 
   return (
@@ -119,7 +147,7 @@ export default function BatchInfoForm({
             required
           />
         </div>
-        {/* Kilograms per Bag (using bag_size) */}
+        {/* Kilograms per Bag (using bag_size instead of kg_per_bag) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Kilograms per Bag *
@@ -143,8 +171,7 @@ export default function BatchInfoForm({
           <input
             type="number"
             name="batch_size"
-            value={formData.batch_size}
-            onChange={handleInputChange}
+            value={calculateTotalBatchSize()} // Use computed value directly here.
             readOnly
             className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-gray-100"
           />
@@ -290,7 +317,8 @@ export default function BatchInfoForm({
                 </label>
                 <select
                   value={ingredient.batch_number}
-                  onChange={(e) => updateIngredient(index, 'batch_number', e.target.value)}
+                  // Use our new handler to update batch number and retrieve best_before_date
+                  onChange={(e) => handleBatchNumberChange(index, e.target.value)}
                   className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   disabled={!ingredient.raw_material_id}
                 >
@@ -306,12 +334,13 @@ export default function BatchInfoForm({
               </div>
 
               <div className="md:col-span-2">
+                {/* This field will be auto-populated if the best before date is available */}
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Best Before Date
                 </label>
                 <input
                   type="date"
-                  value={ingredient.best_before_date}
+                  value={ingredient.best_before_date || ''}
                   onChange={(e) => updateIngredient(index, 'best_before_date', e.target.value)}
                   className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 />
