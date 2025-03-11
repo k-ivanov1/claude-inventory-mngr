@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import {
   CheckCircle2,
@@ -20,6 +20,7 @@ const steps = [
 ]
 
 export default function BatchRecordPage() {
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -193,6 +194,12 @@ export default function BatchRecordPage() {
     return hasValidIngredient
   }
 
+  const validateSecondStep = () => {
+    // Add basic validation for the checklist form
+    // This is a simple validation - you may want to adjust based on your requirements
+    return true
+  }
+
   const handleNext = () => {
     if (currentStep === 0 && !validateFirstStep()) {
       setError('Please fill all required fields before proceeding')
@@ -264,13 +271,27 @@ export default function BatchRecordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Ensure we're on the second step before submitting
+    if (currentStep !== steps.length - 1) {
+      handleNext()
+      return
+    }
+    
+    // Now proceed with form submission
     setLoading(true)
     setError(null)
+    
     try {
       const numericProductId = parseInt(formData.product_id)
       const productId = isNaN(numericProductId) ? formData.product_id : numericProductId
 
-      // Create batch record with updated field names.
+      // Update batch size with calculated value
+      const bags = parseFloat(formData.bags_count) || 0
+      const bagSize = parseFloat(formData.bag_size) || 0
+      const calculatedBatchSize = bags * bagSize
+
+      // Create batch record with updated field names
       const { data: batchData, error: batchError } = await supabase
         .from('batch_manufacturing_records')
         .insert({
@@ -281,9 +302,9 @@ export default function BatchRecordPage() {
           bags_count: parseInt(formData.bags_count) || 0,
           // UPDATED: Use bag_size field
           bag_size: parseFloat(formData.bag_size) || 0,
-          batch_size: parseFloat(formData.batch_size),
+          batch_size: calculatedBatchSize,
           batch_started: formData.batch_started,
-          batch_finished: formData.batch_finished,
+          batch_finished: formData.batch_finished || null,
           scale_id: formData.scale_id,
           scale_target_weight: parseFloat(formData.scale_target_weight),
           scale_actual_reading: parseFloat(formData.scale_actual_reading),
@@ -316,6 +337,7 @@ export default function BatchRecordPage() {
           work_undertaken: formData.work_undertaken
         })
         .select('id')
+      
       if (batchError) throw batchError
 
       const batchId = batchData?.[0]?.id
@@ -333,11 +355,15 @@ export default function BatchRecordPage() {
         const { error: ingredientsError } = await supabase
           .from('batch_ingredients')
           .insert(batchIngredients)
+        
         if (ingredientsError) throw ingredientsError
       }
+      
       setSuccess(true)
+      
+      // After successfully saving, redirect with a delay
       setTimeout(() => {
-        window.location.href = '/dashboard/traceability/batch-records'
+        router.push('/dashboard/traceability/batch-records')
       }, 2000)
     } catch (error: any) {
       console.error('Error saving batch record:', error)
@@ -372,7 +398,7 @@ export default function BatchRecordPage() {
         <div className="bg-green-50 dark:bg-green-900 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-200 px-4 py-3 rounded relative" role="alert">
           <div className="flex items-center">
             <CheckCircle2 className="h-5 w-5 mr-2" />
-            <span className="block sm:inline">Batch record saved successfully!</span>
+            <span className="block sm:inline">Batch record saved successfully! Redirecting to batch records list...</span>
           </div>
         </div>
       )}
@@ -461,7 +487,7 @@ export default function BatchRecordPage() {
               ) : (
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || success}
                   className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
                 >
                   {loading ? 'Saving...' : 'Save Batch Record'}
