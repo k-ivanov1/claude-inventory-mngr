@@ -22,6 +22,7 @@ interface BatchRecord {
   id: string
   date: string
   product_id: string
+  products?: { name: string }
   product_name?: string
   batch_size: number
   batch_started: string
@@ -99,17 +100,26 @@ export default function BatchRecordsPage() {
         `)
         .order('date', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error:', error)
+        throw error
+      }
 
       // Format data with product name
-      const formattedRecords = (data || []).map(record => ({
-        ...record,
-        product_name: record.products?.name,
-        // Default status based on whether batch is finished
-        status: record.batch_finished ? 'completed' : 'in-progress'
-      }))
+      const formattedRecords = (data || []).map(record => {
+        // Check if products is null or undefined
+        const productName = record.products?.name || 'Unknown Product'
+        
+        return {
+          ...record,
+          product_name: productName,
+          // Default status based on whether batch is finished
+          status: record.batch_finished ? 'completed' : 'in-progress'
+        }
+      })
 
       setBatchRecords(formattedRecords)
+      setFilteredRecords(formattedRecords)
     } catch (error: any) {
       console.error('Error fetching batch records:', error)
       setError('Failed to load batch records. Please try again.')
@@ -136,12 +146,16 @@ export default function BatchRecordsPage() {
     }
   }
 
+  const handleClearError = () => {
+    setError(null)
+  }
+
   return (
     <div className="space-y-8">
       {error && (
         <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative" role="alert">
           <span className="block sm:inline">{error}</span>
-          <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setError(null)}>
+          <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={handleClearError}>
             <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
               <title>Close</title>
               <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
