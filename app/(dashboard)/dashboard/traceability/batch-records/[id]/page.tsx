@@ -19,6 +19,7 @@ interface BatchRecord {
   id: string
   date: string
   product_id: string
+  products?: { name: string }
   product_name?: string
   batch_size: number
   batch_started: string
@@ -39,6 +40,7 @@ interface BatchRecord {
   remedial_actions?: string
   work_undertaken?: string
   created_at: string
+  scales?: { description: string, model?: string }
   scale_name?: string
 }
 
@@ -46,6 +48,7 @@ interface BatchIngredient {
   id: string
   batch_id: string
   raw_material_id: string
+  raw_materials?: { name: string, unit?: string }
   raw_material_name?: string
   batch_number?: string
   best_before_date?: string
@@ -85,13 +88,24 @@ export default function BatchRecordDetailPage() {
         .eq('id', batchId)
         .single()
       
-      if (recordError) throw recordError
+      if (recordError) {
+        console.error('Error fetching batch record:', recordError)
+        throw recordError
+      }
 
       if (recordData) {
+        // Check if products and scales properties exist and are not null
+        const productName = recordData.products?.name || 'Unknown Product'
+        const scaleName = recordData.scales 
+          ? `${recordData.scales.description}${recordData.scales.model ? ` (${recordData.scales.model})` : ''}`
+          : 'Unknown Scale'
+        
         const formattedRecord = {
           ...recordData,
-          product_name: recordData.products?.name,
-          scale_name: recordData.scales?.description + (recordData.scales?.model ? ` (${recordData.scales.model})` : '')
+          product_name: productName,
+          scale_name: scaleName,
+          // Set default values for checklist notes if it's null
+          checklist_notes: recordData.checklist_notes || {}
         }
         
         setBatchRecord(formattedRecord)
@@ -106,19 +120,22 @@ export default function BatchRecordDetailPage() {
         `)
         .eq('batch_id', batchId)
       
-      if (ingredientsError) throw ingredientsError
+      if (ingredientsError) {
+        console.error('Error fetching batch ingredients:', ingredientsError)
+        throw ingredientsError
+      }
 
       if (ingredientsData) {
         const formattedIngredients = ingredientsData.map(ingredient => ({
           ...ingredient,
-          raw_material_name: ingredient.raw_materials?.name,
-          unit: ingredient.raw_materials?.unit
+          raw_material_name: ingredient.raw_materials?.name || 'Unknown Material',
+          unit: ingredient.raw_materials?.unit || ''
         }))
         
         setIngredients(formattedIngredients)
       }
     } catch (error: any) {
-      console.error('Error fetching batch record:', error)
+      console.error('Error fetching batch record details:', error)
       setError('Failed to load batch record. Please try again.')
     } finally {
       setLoading(false)
@@ -394,8 +411,7 @@ export default function BatchRecordDetailPage() {
                       </div>
                       {batchRecord.checklist_notes && batchRecord.checklist_notes[item.id] && (
                         <p className="ml-7 text-xs text-gray-500 dark:text-gray-400">
-                          Note: {batchRecord.checklist_notes[item.id]}
-                        </p>
+                          Note: {batchRecord.checklist_notes[item.id]}</p>
                       )}
                     </div>
                   ))}
