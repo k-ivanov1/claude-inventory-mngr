@@ -8,20 +8,15 @@ import {
   ChevronRight,
   AlertTriangle,
   Scale,
-  ClipboardCheck
+  ClipboardCheck,
+  Save
 } from 'lucide-react'
 import { format } from 'date-fns'
 import BatchInfoForm from '@/components/traceability/batch-info-form'
 import BatchChecklistForm from '@/components/traceability/batch-checklist-form'
 
-const steps = [
-  { id: 'batch-info', name: 'Batch Information', icon: Scale },
-  { id: 'checklist', name: 'Product Checklist', icon: ClipboardCheck },
-]
-
 export default function BatchRecordPage() {
   const router = useRouter()
-  const [currentStep, setCurrentStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -30,8 +25,10 @@ export default function BatchRecordPage() {
   const [batchNumbers, setBatchNumbers] = useState<Record<string, any[]>>({})
   const [finalProducts, setFinalProducts] = useState<any[]>([])
   const [availableStock, setAvailableStock] = useState<Record<string, {quantity: number, total_kg: number}>>({})
+  const [infoComplete, setInfoComplete] = useState(false)
+  const [checklistComplete, setChecklistComplete] = useState(false)
 
-  // UPDATED: Removed the kg_per_bag field; now using only bag_size
+  // Form data state
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     product_id: '',
@@ -90,6 +87,18 @@ export default function BatchRecordPage() {
     fetchFinalProducts()
     fetchStockTeaCoffee()
   }, [])
+
+  // Check if batch info is complete
+  useEffect(() => {
+    const isInfoComplete = validateBatchInfo()
+    setInfoComplete(isInfoComplete)
+  }, [formData])
+
+  // Check if checklist is complete
+  useEffect(() => {
+    const isChecklistComplete = validateChecklist()
+    setChecklistComplete(isChecklistComplete)
+  }, [formData])
 
   const fetchEquipment = async () => {
     try {
@@ -210,96 +219,35 @@ export default function BatchRecordPage() {
     }
   }
 
-  const validateFirstStep = () => {
-    // Debug information
-    console.log("Validating first step with these values:", {
-      product_id: formData.product_id,
-      batch_size: formData.batch_size,
-      batch_started: formData.batch_started,
-      scale_id: formData.scale_id,
-      scale_target_weight: formData.scale_target_weight,
-      scale_actual_reading: formData.scale_actual_reading,
-      ingredients: formData.ingredients
-    });
-
-    // Required fields
-    if (!formData.product_id) {
-      setError('Please select a product');
-      return false;
-    }
+  const validateBatchInfo = () => {
+    // Basic validation for batch information
+    if (!formData.product_id) return false
+    if (!formData.product_batch_number) return false
+    if (!formData.product_best_before_date) return false
+    if (!formData.batch_started) return false
+    if (!formData.scale_id) return false
+    if (!formData.scale_target_weight) return false
+    if (!formData.scale_actual_reading) return false
     
-    if (!formData.product_batch_number) {
-      setError('Please enter a batch number');
-      return false;
-    }
+    // Check bag values
+    if (parseFloat(formData.bags_count) <= 0) return false
+    if (parseFloat(formData.bag_size) <= 0) return false
     
-    if (!formData.product_best_before_date) {
-      setError('Please enter a best before date');
-      return false;
-    }
-    
-    if (!formData.bags_count || parseFloat(formData.bags_count) <= 0) {
-      setError('Please enter a valid number of bags');
-      return false;
-    }
-    
-    if (!formData.bag_size || parseFloat(formData.bag_size) <= 0) {
-      setError('Please enter a valid bag size');
-      return false;
-    }
-    
-    // Batch size is calculated, so we don't need to validate it
-    
-    if (!formData.batch_started) {
-      setError('Please enter a batch start time');
-      return false;
-    }
-    
-    if (!formData.scale_id) {
-      setError('Please select a scale');
-      return false;
-    }
-    
-    if (!formData.scale_target_weight) {
-      setError('Please enter a scale target weight');
-      return false;
-    }
-    
-    if (!formData.scale_actual_reading) {
-      setError('Please enter an actual scale reading');
-      return false;
-    }
-
     // Check if at least one ingredient is valid
     const hasValidIngredient = formData.ingredients.some(
       ing => ing.raw_material_id && ing.quantity && parseFloat(ing.quantity) > 0
-    );
+    )
     
-    if (!hasValidIngredient) {
-      setError('Please add at least one ingredient with a valid quantity');
-      return false;
-    }
-
-    return true;
+    return hasValidIngredient
   }
 
-  const validateSecondStep = () => {
-    // Basic validation for checklist
-    return true
-  }
-
-  const handleNext = () => {
-    if (currentStep === 0 && !validateFirstStep()) {
-      // Error message is set in validateFirstStep
-      return
-    }
-    setCurrentStep(prev => Math.min(prev + 1, steps.length - 1))
-    setError(null)
-  }
-
-  const handlePrevious = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 0))
-    setError(null)
+  const validateChecklist = () => {
+    // Basic validation for checklist - checking completion of the main checklist items
+    // This can be customized based on your requirements
+    return formData.equipment_clean && 
+           formData.followed_gmp && 
+           formData.bb_date_match && 
+           formData.label_compliance
   }
 
   const handleInputChange = (
@@ -377,14 +325,9 @@ export default function BatchRecordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // If we're on the first step, just move to the next step
-    if (currentStep === 0) {
-      handleNext()
-      return
-    }
-    
-    // Only proceed with form submission if we're on the last step
-    if (currentStep !== steps.length - 1) {
+    // Validation
+    if (!validateBatchInfo()) {
+      setError('Please complete all required batch information fields')
       return
     }
     
@@ -522,45 +465,24 @@ export default function BatchRecordPage() {
         </div>
       )}
 
-      {/* Steps */}
-      <nav aria-label="Progress">
-        <ol role="list" className="flex items-center">
-          {steps.map((step, index) => (
-            <li key={step.id} className={`relative ${index !== steps.length - 1 ? 'pr-8 sm:pr-20' : ''}`}>
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                {index !== steps.length - 1 && (
-                  <div className={`h-0.5 w-full ${currentStep > index ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
-                )}
-              </div>
-              <div 
-                className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentStep > index 
-                    ? 'bg-indigo-600 dark:bg-indigo-400' 
-                    : currentStep === index 
-                    ? 'bg-indigo-600 dark:bg-indigo-400' 
-                    : 'bg-gray-200 dark:bg-gray-700'
-                }`}
-              >
-                {currentStep > index ? (
-                  <CheckCircle2 className="h-5 w-5 text-white" aria-hidden="true" />
-                ) : (
-                  <step.icon className="h-5 w-5 text-white" aria-hidden="true" />
-                )}
-                <span className="sr-only">{step.name}</span>
-              </div>
-              <div className="mt-2 hidden sm:block">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{step.name}</span>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </nav>
+      {/* Completion status */}
+      <div className="flex justify-between bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
+        <div className="flex items-center">
+          <div className={`h-5 w-5 rounded-full mr-2 ${infoComplete ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+          <span className="font-medium">Batch Information: {infoComplete ? 'Complete' : 'Incomplete'}</span>
+        </div>
+        <div className="flex items-center">
+          <div className={`h-5 w-5 rounded-full mr-2 ${checklistComplete ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+          <span className="font-medium">Compliance Checklist: {checklistComplete ? 'Complete' : 'Incomplete'}</span>
+        </div>
+      </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit}>
-        <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
-          <div className="p-6">
-            {currentStep === 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left column: Batch Info */}
+          <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
+            <div className="p-6">
               <BatchInfoForm
                 formData={formData}
                 handleInputChange={handleInputChange}
@@ -573,48 +495,37 @@ export default function BatchRecordPage() {
                 finalProducts={finalProducts}
                 getMaxAvailableQuantity={getMaxAvailableQuantity}
               />
-            ) : (
+            </div>
+          </div>
+
+          {/* Right column: Checklist */}
+          <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
+            <div className="p-6">
               <BatchChecklistForm
                 formData={formData}
                 handleInputChange={handleInputChange}
                 updateChecklistNote={updateChecklistNote}
               />
-            )}
-          </div>
-          <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-              className={`rounded-md px-3.5 py-2.5 text-sm font-semibold shadow-sm ${
-                currentStep === 0
-                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                  : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600'
-              }`}
-            >
-              Previous
-            </button>
-            <div>
-              {currentStep < steps.length - 1 ? (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={loading || success}
-                  className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
-                >
-                  {loading ? 'Saving...' : 'Save Batch Record'}
-                </button>
-              )}
             </div>
           </div>
+        </div>
+
+        {/* Submit Button */}
+        <div className="mt-8 flex justify-center">
+          <button
+            type="submit"
+            disabled={loading || success}
+            className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {loading ? (
+              <>Saving Batch Record...</>
+            ) : (
+              <>
+                <Save className="h-5 w-5" />
+                Complete Batch Record
+              </>
+            )}
+          </button>
         </div>
       </form>
     </div>
