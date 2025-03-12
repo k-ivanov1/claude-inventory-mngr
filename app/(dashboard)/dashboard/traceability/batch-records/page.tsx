@@ -24,13 +24,14 @@ interface BatchRecord {
   id: string
   date: string
   product_id: string
+  product_batch_number?: string
   products?: { name: string }
   product_name?: string
   batch_size: number
   batch_started: string
   batch_finished?: string
   status?: string
-  created_at: string
+  created_at?: string
 }
 
 export default function BatchRecordsPage() {
@@ -43,10 +44,12 @@ export default function BatchRecordsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [products, setProducts] = useState<Record<string, string>>({})
 
   const supabase = createClientComponentClient()
 
   useEffect(() => {
+    fetchProducts()
     fetchBatchRecords()
   }, [])
 
@@ -58,7 +61,8 @@ export default function BatchRecordsPage() {
       const term = searchTerm.toLowerCase()
       result = result.filter(record => 
         (record.product_name && record.product_name.toLowerCase().includes(term)) ||
-        record.id.toLowerCase().includes(term)
+        (record.product_batch_number && record.product_batch_number.toLowerCase().includes(term)) ||
+        record.id.toString().includes(term)
       )
     }
 
@@ -70,8 +74,9 @@ export default function BatchRecordsPage() {
     // Apply sort
     result = [...result].sort((a, b) => {
       if (sortField === 'date') {
-        const dateA = new Date(a.date).getTime()
-        const dateB = new Date(b.date).getTime()
+        // Use created_at if available, otherwise fall back to date
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date).getTime()
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date).getTime()
         return sortDirection === 'asc' ? dateA - dateB : dateB - dateA
       } else if (sortField === 'batch_size') {
         return sortDirection === 'asc' ? a.batch_size - b.batch_size : b.batch_size - a.batch_size
@@ -89,6 +94,26 @@ export default function BatchRecordsPage() {
     setFilteredRecords(result)
   }, [searchTerm, batchRecords, sortField, sortDirection, filterStatus])
 
+  // Fetch product names to use for lookups
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('final_products')
+        .select('id, name')
+      
+      if (error) throw error
+
+      const productMap: Record<string, string> = {}
+      data?.forEach(product => {
+        productMap[product.id] = product.name
+      })
+      
+      setProducts(productMap)
+    } catch (error) {
+      console.error('Error fetching products:', error)
+    }
+  }
+
   const fetchBatchRecords = async () => {
     setLoading(true)
     setError(null)
@@ -96,14 +121,11 @@ export default function BatchRecordsPage() {
       // Debug logging
       console.log('Fetching batch records...')
       
-      // Fetch batch records with product details
+      // Fetch all batch records without the join
       const { data, error } = await supabase
         .from('batch_manufacturing_records')
-        .select(`
-          *,
-          products:product_id(name)
-        `)
-        .order('created_at', { ascending: false })
+        .select('*')
+        .order('date', { ascending: false })
 
       if (error) {
         console.error('Supabase error:', error)
@@ -112,12 +134,17 @@ export default function BatchRecordsPage() {
 
       console.log('Fetched batch records:', data)
 
-      // Format data with product name
+      // Format data and add product name from our local products object
       const formattedRecords = (data || []).map(record => {
         console.log('Processing record:', record)
         
-        // Check if products is null or undefined
-        const productName = record.products?.name || 'Unknown Product'
+        // Get product name either from join or from our products object
+        let productName = 'Unknown Product'
+        if (record.products?.name) {
+          productName = record.products.name
+        } else if (products[record.product_id]) {
+          productName = products[record.product_id]
+        }
         
         return {
           ...record,
@@ -148,6 +175,15 @@ export default function BatchRecordsPage() {
     }
   }
 
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return '-'
+    try {
+      return format(parseISO(dateString), 'dd/MM/yyyy')
+    } catch (e) {
+      return dateString
+    }
+  }
+
   const formatDateTime = (dateTimeString: string | undefined) => {
     if (!dateTimeString) return '-'
     try {
@@ -162,6 +198,7 @@ export default function BatchRecordsPage() {
   }
   
   const handleRefresh = () => {
+    fetchProducts()
     fetchBatchRecords()
   }
 
@@ -254,6 +291,9 @@ export default function BatchRecordsPage() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Batch ID
                 </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Batch Number
+                </th>
                 <th 
                   scope="col" 
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
@@ -301,7 +341,7 @@ export default function BatchRecordsPage() {
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={9} className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-400">
                     <div className="flex justify-center items-center">
                       <RefreshCw className="h-5 w-5 animate-spin mr-3" />
                       Loading batch records...
@@ -310,7 +350,7 @@ export default function BatchRecordsPage() {
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={9} className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-400">
                     No batch records found. Try refreshing or creating a new batch record.
                   </td>
                 </tr>
@@ -324,9 +364,12 @@ export default function BatchRecordsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {record.product_batch_number || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                        {record.date ? format(parseISO(record.date), 'dd/MM/yyyy') : '-'}
+                        {formatDate(record.date)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
