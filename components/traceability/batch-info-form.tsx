@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, AlertCircle, InfoIcon } from 'lucide-react'
 
 export interface BatchInfoFormProps {
   formData: {
@@ -59,8 +59,9 @@ export interface BatchInfoFormProps {
   removeIngredient: (index: number) => void
   equipment: any[]
   rawMaterials: any[]
-  batchNumbers: Record<string, string[]>
+  batchNumbers: Record<string, any[]>
   finalProducts: any[]
+  getMaxAvailableQuantity: (rawMaterialId: string, batchNumber: string) => number
 }
 
 const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
@@ -72,7 +73,8 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
   equipment,
   rawMaterials,
   batchNumbers,
-  finalProducts
+  finalProducts,
+  getMaxAvailableQuantity
 }) => {
   // Calculate total batch size using bags_count and bag_size
   const calculateTotalBatchSize = () => {
@@ -82,25 +84,10 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
   }
 
   // When a batch number is changed for an ingredient, update the field and fetch best_before_date
-  const handleBatchNumberChange = async (index: number, batchNumber: string) => {
+  const handleBatchNumberChange = (index: number, batchNumber: string) => {
+    // Just calling updateIngredient will handle the best_before_date auto-population
+    // since we've enhanced that function in the parent component
     updateIngredient(index, 'batch_number', batchNumber)
-    const ingredient = formData.ingredients[index]
-    const rawMaterialId = ingredient.raw_material_id
-    if (!rawMaterialId || !batchNumber) return
-
-    // Example: query your 'stock_receiving' table for best_before_date.
-    // Adjust the query as needed for your schema.
-    // Here we assume you have an imported supabase client.
-    // For example:
-    // const { data, error } = await supabase
-    //   .from('stock_receiving')
-    //   .select('best_before_date')
-    //   .eq('raw_material_id', rawMaterialId)
-    //   .eq('batch_number', batchNumber)
-    //   .single()
-    // if (!error && data) {
-    //   updateIngredient(index, 'best_before_date', data.best_before_date)
-    // }
   }
 
   return (
@@ -167,8 +154,7 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
           />
         </div>
         {/* Number of Bags */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Bags *</label>
+        <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Bags *</label>
           <input
             type="number"
             name="bags_count"
@@ -303,82 +289,134 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
         </div>
 
         <div className="mt-4 space-y-4">
-          {formData.ingredients.map((ingredient: any, index: number) => (
-            <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-              <div className="md:col-span-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Raw Material *</label>
-                <select
-                  value={ingredient.raw_material_id}
-                  onChange={(e) => updateIngredient(index, 'raw_material_id', e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  required
-                >
-                  <option value="">Select raw material</option>
-                  {rawMaterials.map((material) => (
-                    <option key={material.id} value={material.id}>
-                      {material.name} ({material.unit})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="md:col-span-3">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Batch Number</label>
-                <select
-                  value={ingredient.batch_number}
-                  onChange={(e) => {
-                    // When selecting a batch number, trigger best before date retrieval.
-                    handleBatchNumberChange(index, e.target.value)
-                  }}
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  disabled={!ingredient.raw_material_id}
-                >
-                  <option value="">Select batch number</option>
-                  {ingredient.raw_material_id &&
-                    (batchNumbers[rawMaterials.find(m => m.id === ingredient.raw_material_id)?.name] || []).map((batchNumber: string) => (
-                      <option key={batchNumber} value={batchNumber}>
-                        {batchNumber}
+          {formData.ingredients.map((ingredient: any, index: number) => {
+            // Get raw material details
+            const rawMaterial = ingredient.raw_material_id ? 
+              rawMaterials.find(m => m.id === ingredient.raw_material_id) : null;
+            
+            // Get available batches for this raw material
+            const availableBatches = rawMaterial?.name ? 
+              batchNumbers[rawMaterial.name] || [] : [];
+            
+            // Get the max available quantity for this ingredient's batch
+            const maxAvailableQty = getMaxAvailableQuantity(
+              ingredient.raw_material_id, 
+              ingredient.batch_number
+            );
+            
+            return (
+              <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-4 border border-gray-200 dark:border-gray-700 rounded-md">
+                <div className="md:col-span-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Raw Material *</label>
+                  <select
+                    value={ingredient.raw_material_id}
+                    onChange={(e) => updateIngredient(index, 'raw_material_id', e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    required
+                  >
+                    <option value="">Select raw material</option>
+                    {rawMaterials.map((material) => (
+                      <option key={material.id} value={material.id}>
+                        {material.name} ({material.unit})
                       </option>
-                    ))
-                  }
-                </select>
-              </div>
+                    ))}
+                  </select>
+                </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Best Before Date</label>
-                <input
-                  type="date"
-                  value={ingredient.best_before_date || ''}
-                  onChange={(e) => updateIngredient(index, 'best_before_date', e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-              </div>
+                <div className="md:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Batch Number
+                    {ingredient.raw_material_id && availableBatches.length === 0 && (
+                      <span className="ml-1 text-amber-500 dark:text-amber-400">
+                        <AlertCircle className="inline h-4 w-4" /> No batches available
+                      </span>
+                    )}
+                  </label>
+                  <select
+                    value={ingredient.batch_number}
+                    onChange={(e) => handleBatchNumberChange(index, e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    disabled={!ingredient.raw_material_id || availableBatches.length === 0}
+                  >
+                    <option value="">Select batch number</option>
+                    {availableBatches.map((batch) => (
+                      <option key={batch.batch_number} value={batch.batch_number}>
+                        {batch.batch_number} (Qty: {batch.available_quantity})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Quantity *</label>
-                <input
-                  type="number"
-                  value={ingredient.quantity}
-                  onChange={(e) => updateIngredient(index, 'quantity', e.target.value)}
-                  step="0.001"
-                  min="0"
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  required
-                />
-              </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Best Before Date</label>
+                  <input
+                    type="date"
+                    value={ingredient.best_before_date || ''}
+                    onChange={(e) => updateIngredient(index, 'best_before_date', e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  />
+                </div>
 
-              <div className="md:col-span-1 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => removeIngredient(index)}
-                  className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                  title="Remove ingredient"
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Quantity *
+                    {maxAvailableQty > 0 && (
+                      <span className="text-xs ml-1 text-green-600 dark:text-green-400">
+                        (Max: {maxAvailableQty})
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    value={ingredient.quantity}
+                    onChange={(e) => updateIngredient(index, 'quantity', e.target.value)}
+                    step="0.001"
+                    min="0"
+                    max={maxAvailableQty > 0 ? maxAvailableQty : undefined}
+                    className={`mt-1 block w-full rounded-md border ${
+                      ingredient.quantity && parseFloat(ingredient.quantity) > maxAvailableQty && maxAvailableQty > 0
+                        ? 'border-red-300 dark:border-red-600'
+                        : 'border-gray-300 dark:border-gray-600'
+                    } px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
+                    required
+                  />
+                  {ingredient.quantity && parseFloat(ingredient.quantity) > maxAvailableQty && maxAvailableQty > 0 && (
+                    <p className="mt-1 text-xs text-red-500">
+                      Exceeds available quantity
+                    </p>
+                  )}
+                </div>
+
+                <div className="md:col-span-1 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => removeIngredient(index)}
+                    className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                    title="Remove ingredient"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Stock availability info */}
+                {ingredient.raw_material_id && ingredient.batch_number && (
+                  <div className="md:col-span-12 bg-blue-50 dark:bg-blue-900/30 p-2 rounded-md">
+                    <div className="flex items-start">
+                      <InfoIcon className="h-5 w-5 text-blue-500 dark:text-blue-400 mr-2 mt-0.5" />
+                      <div className="text-sm text-blue-700 dark:text-blue-300">
+                        <p>
+                          <span className="font-medium">Stock info:</span> 
+                          {maxAvailableQty > 0 
+                            ? ` ${maxAvailableQty} units available from this batch` 
+                            : ' No stock available for this batch'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
