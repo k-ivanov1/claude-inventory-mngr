@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import {
   CheckCircle2,
-  ChevronRight,
   AlertTriangle,
   Scale,
   ClipboardCheck,
-  Save
+  Save,
+  X,
+  ArrowRight
 } from 'lucide-react'
 import { format } from 'date-fns'
 import BatchInfoForm from '@/components/traceability/batch-info-form'
@@ -25,6 +26,10 @@ export default function BatchRecordPage() {
   const [batchNumbers, setBatchNumbers] = useState<Record<string, any[]>>({})
   const [finalProducts, setFinalProducts] = useState<any[]>([])
   const [availableStock, setAvailableStock] = useState<Record<string, {quantity: number, total_kg: number}>>({})
+  
+  // State for batch record and checklist
+  const [showChecklist, setShowChecklist] = useState(false)
+  const [batchId, setBatchId] = useState<string | null>(null)
   const [infoComplete, setInfoComplete] = useState(false)
   const [checklistComplete, setChecklistComplete] = useState(false)
 
@@ -243,7 +248,6 @@ export default function BatchRecordPage() {
 
   const validateChecklist = () => {
     // Basic validation for checklist - checking completion of the main checklist items
-    // This can be customized based on your requirements
     return formData.equipment_clean && 
            formData.followed_gmp && 
            formData.bb_date_match && 
@@ -322,13 +326,11 @@ export default function BatchRecordPage() {
     })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    // Validation
+  // Save batch information first
+  const saveBatchInfo = async () => {
     if (!validateBatchInfo()) {
       setError('Please complete all required batch information fields')
-      return
+      return null
     }
     
     setLoading(true)
@@ -340,12 +342,12 @@ export default function BatchRecordPage() {
       const bagSize = parseFloat(formData.bag_size) || 0
       const calculatedBatchSize = bags * bagSize
 
-      // Create batch record - using the product_id as is without parsing
+      // Create batch record with minimal info - we'll update with checklist later
       const { data: batchData, error: batchError } = await supabase
         .from('batch_manufacturing_records')
         .insert({
           date: formData.date,
-          product_id: formData.product_id, // Keep as string
+          product_id: formData.product_id,
           product_batch_number: formData.product_batch_number,
           product_best_before_date: formData.product_best_before_date,
           bags_count: parseInt(formData.bags_count) || 0,
@@ -355,7 +357,59 @@ export default function BatchRecordPage() {
           batch_finished: formData.batch_finished || null,
           scale_id: formData.scale_id,
           scale_target_weight: parseFloat(formData.scale_target_weight),
-          scale_actual_reading: parseFloat(formData.scale_actual_reading),
+          scale_actual_reading: parseFloat(formData.scale_actual_reading)
+        })
+        .select('id')
+      
+      if (batchError) throw batchError
+
+      const batchId = batchData?.[0]?.id
+      if (batchId) {
+        const validIngredients = formData.ingredients
+          .filter(ing => ing.raw_material_id && ing.quantity)
+        
+        const batchIngredients = validIngredients.map(ing => ({
+          batch_id: batchId,
+          raw_material_id: ing.raw_material_id,
+          batch_number: ing.batch_number || null,
+          best_before_date: ing.best_before_date || null,
+          quantity: parseFloat(ing.quantity)
+        }))
+
+        if (batchIngredients.length > 0) {
+          const { error: ingredientsError } = await supabase
+            .from('batch_ingredients')
+            .insert(batchIngredients)
+          
+          if (ingredientsError) throw ingredientsError
+        }
+        
+        return batchId
+      }
+      return null
+    } catch (error: any) {
+      console.error('Error saving batch record:', error)
+      setError(error.message || 'Failed to save batch record. Please try again.')
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // Update with checklist info
+  const saveChecklist = async () => {
+    if (!batchId) {
+      setError('Batch ID is missing. Cannot save checklist.')
+      return
+    }
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const { error: updateError } = await supabase
+        .from('batch_manufacturing_records')
+        .update({
           equipment_clean: formData.equipment_clean,
           equipment_clean_initials: formData.equipment_clean_initials,
           followed_gmp: formData.followed_gmp,
@@ -384,31 +438,9 @@ export default function BatchRecordPage() {
           remedial_actions: formData.remedial_actions,
           work_undertaken: formData.work_undertaken
         })
-        .select('id')
+        .eq('id', batchId)
       
-      if (batchError) throw batchError
-
-      const batchId = batchData?.[0]?.id
-      if (batchId) {
-        const validIngredients = formData.ingredients
-          .filter(ing => ing.raw_material_id && ing.quantity)
-        
-        const batchIngredients = validIngredients.map(ing => ({
-          batch_id: batchId,
-          raw_material_id: ing.raw_material_id,
-          batch_number: ing.batch_number || null,
-          best_before_date: ing.best_before_date || null,
-          quantity: parseFloat(ing.quantity)
-        }))
-
-        if (batchIngredients.length > 0) {
-          const { error: ingredientsError } = await supabase
-            .from('batch_ingredients')
-            .insert(batchIngredients)
-          
-          if (ingredientsError) throw ingredientsError
-        }
-      }
+      if (updateError) throw updateError
       
       setSuccess(true)
       
@@ -417,11 +449,27 @@ export default function BatchRecordPage() {
         router.push('/dashboard/traceability/batch-records')
       }, 3000)
     } catch (error: any) {
-      console.error('Error saving batch record:', error)
-      setError(error.message || 'Failed to save batch record. Please try again.')
+      console.error('Error saving checklist:', error)
+      setError(error.message || 'Failed to save checklist. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // Handle initial form submission - save batch info and show checklist
+  const handleCreateBatch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const id = await saveBatchInfo()
+    if (id) {
+      setBatchId(id)
+      setShowChecklist(true)
+    }
+  }
+
+  // Complete the batch with checklist
+  const handleCompleteChecklist = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await saveChecklist()
   }
 
   // Get maximum available quantity for a specific raw material and batch (in KG)
@@ -465,22 +513,9 @@ export default function BatchRecordPage() {
         </div>
       )}
 
-      {/* Completion status */}
-      <div className="flex justify-between bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-        <div className="flex items-center">
-          <div className={`h-5 w-5 rounded-full mr-2 ${infoComplete ? 'bg-green-500' : 'bg-amber-500'}`}></div>
-          <span className="font-medium">Batch Information: {infoComplete ? 'Complete' : 'Incomplete'}</span>
-        </div>
-        <div className="flex items-center">
-          <div className={`h-5 w-5 rounded-full mr-2 ${checklistComplete ? 'bg-green-500' : 'bg-amber-500'}`}></div>
-          <span className="font-medium">Compliance Checklist: {checklistComplete ? 'Complete' : 'Incomplete'}</span>
-        </div>
-      </div>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left column: Batch Info */}
+      {/* Batch Info Form */}
+      {!showChecklist && (
+        <form onSubmit={handleCreateBatch}>
           <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
             <div className="p-6">
               <BatchInfoForm
@@ -496,38 +531,64 @@ export default function BatchRecordPage() {
                 getMaxAvailableQuantity={getMaxAvailableQuantity}
               />
             </div>
-          </div>
-
-          {/* Right column: Checklist */}
-          <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
-            <div className="p-6">
-              <BatchChecklistForm
-                formData={formData}
-                handleInputChange={handleInputChange}
-                updateChecklistNote={updateChecklistNote}
-              />
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+              <button
+                type="submit"
+                disabled={loading || !infoComplete}
+                className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Saving...' : 'Create Batch Record'}
+                <ArrowRight className="h-4 w-4" />
+              </button>
             </div>
           </div>
-        </div>
+        </form>
+      )}
 
-        {/* Submit Button */}
-        <div className="mt-8 flex justify-center">
-          <button
-            type="submit"
-            disabled={loading || success}
-            className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
-          >
-            {loading ? (
-              <>Saving Batch Record...</>
-            ) : (
-              <>
-                <Save className="h-5 w-5" />
-                Complete Batch Record
-              </>
-            )}
-          </button>
+      {/* Checklist Modal */}
+      {showChecklist && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-medium">Complete Batch Record Checklist</h3>
+              <button 
+                onClick={() => setShowChecklist(false)}
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCompleteChecklist}>
+              <div className="p-5">
+                <BatchChecklistForm
+                  formData={formData}
+                  handleInputChange={handleInputChange}
+                  updateChecklistNote={updateChecklistNote}
+                />
+              </div>
+              
+              <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowChecklist(false)}
+                  className="inline-flex items-center rounded-md bg-white dark:bg-gray-700 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  {loading ? 'Saving...' : 'Complete Batch Record'}
+                  <Save className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </form>
+      )}
     </div>
   )
 }
