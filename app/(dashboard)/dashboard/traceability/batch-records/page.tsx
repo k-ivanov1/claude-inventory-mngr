@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Download,
   Plus,
+  RefreshCw
 } from 'lucide-react'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
@@ -91,6 +92,9 @@ export default function BatchRecordsPage() {
     setLoading(true)
     setError(null)
     try {
+      // Debug logging
+      console.log('Fetching batch records...')
+      
       // Fetch batch records with product details
       const { data, error } = await supabase
         .from('batch_manufacturing_records')
@@ -98,15 +102,19 @@ export default function BatchRecordsPage() {
           *,
           products:product_id(name)
         `)
-        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Supabase error:', error)
         throw error
       }
 
+      console.log('Fetched batch records:', data)
+
       // Format data with product name
       const formattedRecords = (data || []).map(record => {
+        console.log('Processing record:', record)
+        
         // Check if products is null or undefined
         const productName = record.products?.name || 'Unknown Product'
         
@@ -117,6 +125,8 @@ export default function BatchRecordsPage() {
           status: record.batch_finished ? 'completed' : 'in-progress'
         }
       })
+
+      console.log('Formatted records:', formattedRecords)
 
       setBatchRecords(formattedRecords)
       setFilteredRecords(formattedRecords)
@@ -149,18 +159,21 @@ export default function BatchRecordsPage() {
   const handleClearError = () => {
     setError(null)
   }
+  
+  const handleRefresh = () => {
+    fetchBatchRecords()
+  }
 
   return (
     <div className="space-y-8">
       {error && (
         <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative" role="alert">
-          <span className="block sm:inline">{error}</span>
-          <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={handleClearError}>
-            <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-              <title>Close</title>
-              <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
-            </svg>
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="block sm:inline">{error}</span>
+            <button onClick={handleClearError} className="text-red-700 dark:text-red-200">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -171,12 +184,21 @@ export default function BatchRecordsPage() {
             View and manage batch manufacturing records
           </p>
         </div>
-        <Link href="/dashboard/traceability">
-          <button className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-            <Plus className="h-5 w-5" />
-            New Batch Record
+        <div className="flex space-x-3">
+          <button 
+            onClick={handleRefresh} 
+            className="inline-flex items-center gap-x-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3.5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+            title="Refresh batch records"
+          >
+            <RefreshCw className="h-5 w-5" />
           </button>
-        </Link>
+          <Link href="/dashboard/traceability">
+            <button className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+              <Plus className="h-5 w-5" />
+              New Batch Record
+            </button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex items-center justify-between">
@@ -279,13 +301,16 @@ export default function BatchRecordsPage() {
               {loading ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-400">
-                    Loading batch records...
+                    <div className="flex justify-center items-center">
+                      <RefreshCw className="h-5 w-5 animate-spin mr-3" />
+                      Loading batch records...
+                    </div>
                   </td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-400">
-                    No batch records found.
+                    No batch records found. Try refreshing or creating a new batch record.
                   </td>
                 </tr>
               ) : (
@@ -300,14 +325,14 @@ export default function BatchRecordsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                        {format(parseISO(record.date), 'dd/MM/yyyy')}
+                        {record.date ? format(parseISO(record.date), 'dd/MM/yyyy') : '-'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       {record.product_name || 'Unknown Product'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {record.batch_size} kg
+                      {record.batch_size !== undefined ? `${record.batch_size} kg` : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex items-center">
