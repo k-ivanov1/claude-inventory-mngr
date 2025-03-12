@@ -13,7 +13,8 @@ import {
   ChevronDown,
   Download,
   Plus,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
