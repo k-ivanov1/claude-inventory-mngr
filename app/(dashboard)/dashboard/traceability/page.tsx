@@ -29,7 +29,7 @@ export default function BatchRecordPage() {
   const [rawMaterials, setRawMaterials] = useState<any[]>([])
   const [batchNumbers, setBatchNumbers] = useState<Record<string, any[]>>({})
   const [finalProducts, setFinalProducts] = useState<any[]>([])
-  const [availableStock, setAvailableStock] = useState<Record<string, number>>({})
+  const [availableStock, setAvailableStock] = useState<Record<string, {quantity: number, total_kg: number}>>({})
 
   // UPDATED: Removed the kg_per_bag field; now using only bag_size
   const [formData, setFormData] = useState({
@@ -148,7 +148,7 @@ export default function BatchRecordPage() {
 
       // Group stock by product_name and batch_number
       const batchesByProduct: Record<string, any[]> = {}
-      const stockQuantities: Record<string, number> = {}
+      const stockQuantities: Record<string, {quantity: number, total_kg: number}> = {}
 
       data?.forEach(stock => {
         if (stock.product_name) {
@@ -166,19 +166,22 @@ export default function BatchRecordPage() {
             batchesByProduct[stock.product_name].push({
               batch_number: stock.batch_number,
               best_before_date: stock.best_before_date || '',
-              available_quantity: stock.quantity || 0
+              available_quantity: stock.quantity || 0,
+              available_kg: stock.total_kg || 0
             })
           } else if (existingBatchIndex !== -1 && stock.batch_number) {
             // Add to the available quantity if the batch already exists
             batchesByProduct[stock.product_name][existingBatchIndex].available_quantity += (stock.quantity || 0)
+            batchesByProduct[stock.product_name][existingBatchIndex].available_kg += (stock.total_kg || 0)
           }
           
           // Track total available stock by product_name + batch_number
           const stockKey = `${stock.product_name}-${stock.batch_number || 'unknown'}`
           if (!stockQuantities[stockKey]) {
-            stockQuantities[stockKey] = 0
+            stockQuantities[stockKey] = { quantity: 0, total_kg: 0 }
           }
-          stockQuantities[stockKey] += (stock.quantity || 0)
+          stockQuantities[stockKey].quantity += (stock.quantity || 0)
+          stockQuantities[stockKey].total_kg += (stock.total_kg || 0)
         }
       })
       
@@ -208,17 +211,76 @@ export default function BatchRecordPage() {
   }
 
   const validateFirstStep = () => {
-    if (!formData.product_id) return false
-    if (parseFloat(formData.batch_size) <= 0) return false
-    if (!formData.batch_started) return false
-    if (!formData.scale_id) return false
-    if (!formData.scale_target_weight) return false
-    if (!formData.scale_actual_reading) return false
+    // Debug information
+    console.log("Validating first step with these values:", {
+      product_id: formData.product_id,
+      batch_size: formData.batch_size,
+      batch_started: formData.batch_started,
+      scale_id: formData.scale_id,
+      scale_target_weight: formData.scale_target_weight,
+      scale_actual_reading: formData.scale_actual_reading,
+      ingredients: formData.ingredients
+    });
 
+    // Required fields
+    if (!formData.product_id) {
+      setError('Please select a product');
+      return false;
+    }
+    
+    if (!formData.product_batch_number) {
+      setError('Please enter a batch number');
+      return false;
+    }
+    
+    if (!formData.product_best_before_date) {
+      setError('Please enter a best before date');
+      return false;
+    }
+    
+    if (!formData.bags_count || parseFloat(formData.bags_count) <= 0) {
+      setError('Please enter a valid number of bags');
+      return false;
+    }
+    
+    if (!formData.bag_size || parseFloat(formData.bag_size) <= 0) {
+      setError('Please enter a valid bag size');
+      return false;
+    }
+    
+    // Batch size is calculated, so we don't need to validate it
+    
+    if (!formData.batch_started) {
+      setError('Please enter a batch start time');
+      return false;
+    }
+    
+    if (!formData.scale_id) {
+      setError('Please select a scale');
+      return false;
+    }
+    
+    if (!formData.scale_target_weight) {
+      setError('Please enter a scale target weight');
+      return false;
+    }
+    
+    if (!formData.scale_actual_reading) {
+      setError('Please enter an actual scale reading');
+      return false;
+    }
+
+    // Check if at least one ingredient is valid
     const hasValidIngredient = formData.ingredients.some(
-      ing => ing.raw_material_id && ing.quantity
-    )
-    return hasValidIngredient
+      ing => ing.raw_material_id && ing.quantity && parseFloat(ing.quantity) > 0
+    );
+    
+    if (!hasValidIngredient) {
+      setError('Please add at least one ingredient with a valid quantity');
+      return false;
+    }
+
+    return true;
   }
 
   const validateSecondStep = () => {
@@ -228,7 +290,7 @@ export default function BatchRecordPage() {
 
   const handleNext = () => {
     if (currentStep === 0 && !validateFirstStep()) {
-      setError('Please fill all required fields before proceeding')
+      // Error message is set in validateFirstStep
       return
     }
     setCurrentStep(prev => Math.min(prev + 1, steps.length - 1))
@@ -330,8 +392,11 @@ export default function BatchRecordPage() {
     setError(null)
     
     try {
-      const numericProductId = parseInt(formData.product_id)
-      const productId = isNaN(numericProductId) ? formData.product_id : numericProductId
+      // Parse the product ID correctly
+      let productId = formData.product_id;
+      if (!isNaN(parseInt(formData.product_id))) {
+        productId = parseInt(formData.product_id);
+      }
 
       // Calculate batch size from bags_count and bag_size
       const bags = parseFloat(formData.bags_count) || 0
@@ -422,7 +487,7 @@ export default function BatchRecordPage() {
     }
   }
 
-  // Get maximum available quantity for a specific raw material and batch
+  // Get maximum available quantity for a specific raw material and batch (in KG)
   const getMaxAvailableQuantity = (rawMaterialId: string, batchNumber: string): number => {
     if (!rawMaterialId || !batchNumber) return 0
     
@@ -430,7 +495,7 @@ export default function BatchRecordPage() {
     if (!rawMaterial || !rawMaterial.name) return 0
     
     const stockKey = `${rawMaterial.name}-${batchNumber}`
-    return availableStock[stockKey] || 0
+    return availableStock[stockKey]?.total_kg || 0
   }
 
   return (
