@@ -392,23 +392,17 @@ export default function BatchRecordPage() {
     setError(null)
     
     try {
-      // Parse the product ID correctly
-      let productId = formData.product_id;
-      if (!isNaN(parseInt(formData.product_id))) {
-        productId = parseInt(formData.product_id);
-      }
-
       // Calculate batch size from bags_count and bag_size
       const bags = parseFloat(formData.bags_count) || 0
       const bagSize = parseFloat(formData.bag_size) || 0
       const calculatedBatchSize = bags * bagSize
 
-      // Create batch record
+      // Create batch record - using the product_id as is without parsing
       const { data: batchData, error: batchError } = await supabase
         .from('batch_manufacturing_records')
         .insert({
           date: formData.date,
-          product_id: productId,
+          product_id: formData.product_id, // Keep as string
           product_batch_number: formData.product_batch_number,
           product_best_before_date: formData.product_best_before_date,
           bags_count: parseInt(formData.bags_count) || 0,
