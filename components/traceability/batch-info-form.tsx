@@ -83,7 +83,7 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
     return (bags * bagSize).toFixed(2)
   }
 
-  // When a batch number is changed for an ingredient, update the field and fetch best_before_date
+  // When a batch number is changed for an ingredient, update the field
   const handleBatchNumberChange = (index: number, batchNumber: string) => {
     // Just calling updateIngredient will handle the best_before_date auto-population
     // since we've enhanced that function in the parent component
@@ -112,8 +112,7 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
           />
         </div>
         {/* Product Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product *</label>
+        <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product *</label>
           <select
             name="product_id"
             value={formData.product_id}
@@ -154,7 +153,8 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
           />
         </div>
         {/* Number of Bags */}
-        <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Bags *</label>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Bags *</label>
           <input
             type="number"
             name="bags_count"
@@ -298,8 +298,8 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
             const availableBatches = rawMaterial?.name ? 
               batchNumbers[rawMaterial.name] || [] : [];
             
-            // Get the max available quantity for this ingredient's batch
-            const maxAvailableQty = getMaxAvailableQuantity(
+            // Get the max available quantity for this ingredient's batch (in KG)
+            const maxAvailableKg = getMaxAvailableQuantity(
               ingredient.raw_material_id, 
               ingredient.batch_number
             );
@@ -341,7 +341,7 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
                     <option value="">Select batch number</option>
                     {availableBatches.map((batch) => (
                       <option key={batch.batch_number} value={batch.batch_number}>
-                        {batch.batch_number} (Qty: {batch.available_quantity})
+                        {batch.batch_number} (Available: {batch.available_kg.toFixed(2)} kg)
                       </option>
                     ))}
                   </select>
@@ -359,10 +359,10 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Quantity *
-                    {maxAvailableQty > 0 && (
+                    Quantity (kg) *
+                    {maxAvailableKg > 0 && (
                       <span className="text-xs ml-1 text-green-600 dark:text-green-400">
-                        (Max: {maxAvailableQty})
+                        (Max: {maxAvailableKg.toFixed(2)} kg)
                       </span>
                     )}
                   </label>
@@ -372,15 +372,15 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
                     onChange={(e) => updateIngredient(index, 'quantity', e.target.value)}
                     step="0.001"
                     min="0"
-                    max={maxAvailableQty > 0 ? maxAvailableQty : undefined}
+                    max={maxAvailableKg > 0 ? maxAvailableKg : undefined}
                     className={`mt-1 block w-full rounded-md border ${
-                      ingredient.quantity && parseFloat(ingredient.quantity) > maxAvailableQty && maxAvailableQty > 0
+                      ingredient.quantity && parseFloat(ingredient.quantity) > maxAvailableKg && maxAvailableKg > 0
                         ? 'border-red-300 dark:border-red-600'
                         : 'border-gray-300 dark:border-gray-600'
                     } px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
                     required
                   />
-                  {ingredient.quantity && parseFloat(ingredient.quantity) > maxAvailableQty && maxAvailableQty > 0 && (
+                  {ingredient.quantity && parseFloat(ingredient.quantity) > maxAvailableKg && maxAvailableKg > 0 && (
                     <p className="mt-1 text-xs text-red-500">
                       Exceeds available quantity
                     </p>
@@ -406,8 +406,8 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
                       <div className="text-sm text-blue-700 dark:text-blue-300">
                         <p>
                           <span className="font-medium">Stock info:</span> 
-                          {maxAvailableQty > 0 
-                            ? ` ${maxAvailableQty} units available from this batch` 
+                          {maxAvailableKg > 0 
+                            ? ` ${maxAvailableKg.toFixed(2)} kg available from this batch` 
                             : ' No stock available for this batch'}
                         </p>
                       </div>
