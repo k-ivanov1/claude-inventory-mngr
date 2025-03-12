@@ -138,7 +138,7 @@ export default function BatchChecklistForm({
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Product Labeling & Compliance Checklist</h3>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
@@ -152,9 +152,9 @@ export default function BatchChecklistForm({
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Check each item and add your initials to confirm.
         </p>
-        <div className="mt-4 space-y-6">
+        <div className="mt-4 space-y-4">
           {completionChecklist.map((item) => (
-            <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+            <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3">
               <div className="flex items-start flex-1">
                 <div className="flex h-5 items-center">
                   <input
@@ -172,7 +172,7 @@ export default function BatchChecklistForm({
                   </label>
                 </div>
               </div>
-              <div className="w-full sm:w-1/4">
+              <div className="w-full sm:w-1/3">
                 <input
                   type="text"
                   name={item.initialsField}
@@ -193,9 +193,9 @@ export default function BatchChecklistForm({
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Check each item and add any necessary notes.
         </p>
-        <div className="mt-4 space-y-6">
+        <div className="mt-4 space-y-4">
           {labelChecklist.map((item) => (
-            <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+            <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3">
               <div className="flex items-start flex-1">
                 <div className="flex h-5 items-center">
                   <input
@@ -227,13 +227,13 @@ export default function BatchChecklistForm({
         </div>
       </div>
 
-      {/* Manager’s Section */}
+      {/* Manager's Section */}
       <div>
-        <h4 className="text-md font-medium text-gray-900 dark:text-white">Manager’s Section</h4>
-        <div className="mt-4 space-y-4">
+        <h4 className="text-md font-medium text-gray-900 dark:text-white">Manager's Section</h4>
+        <div className="mt-4 space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Manager’s Comments
+              Manager's Comments
             </label>
             <textarea
               name="manager_comments"
