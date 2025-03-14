@@ -132,6 +132,7 @@ export default function BatchRecordsPage() {
 
       if (error) {
         console.error('Supabase error:', error)
+        console.error('Error details:', JSON.stringify(error, null, 2))
         throw error
       }
 
