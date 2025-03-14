@@ -49,13 +49,7 @@ export default function BatchRecordsPage() {
   const supabase = createClientComponentClient()
 
   useEffect(() => {
-    const loadData = async () => {
-      // First fetch products, then batch records
-      await fetchProducts()
-      await fetchBatchRecords()
-    }
-    
-    loadData()
+    fetchBatchRecords()
   }, [])
 
   useEffect(() => {
@@ -108,11 +102,15 @@ export default function BatchRecordsPage() {
       
       if (error) throw error
 
+      console.log('Fetched products data:', data)
+      
       const productMap: Record<string, string> = {}
       data?.forEach(product => {
         productMap[product.id] = product.name
+        console.log(`Added product to map: ID ${product.id} -> ${product.name}`)
       })
       
+      console.log('Complete product map:', productMap)
       setProducts(productMap)
     } catch (error) {
       console.error('Error fetching products:', error)
@@ -126,43 +124,73 @@ export default function BatchRecordsPage() {
       // Debug logging
       console.log('Fetching batch records...')
       
-      // Fetch batch records without join for now
-      const { data, error } = await supabase
+      // First, get all batch records
+      const { data: batchData, error: batchError } = await supabase
         .from('batch_manufacturing_records')
         .select('*')
         .order('date', { ascending: false })
 
-      if (error) {
-        console.error('Supabase error:', error)
-        console.error('Error details:', JSON.stringify(error, null, 2))
-        throw error
+      if (batchError) {
+        console.error('Supabase error fetching batches:', batchError)
+        throw batchError
       }
 
-      console.log('Fetched batch records:', data)
-
-      // Format data and add product name from our local products object
-      const formattedRecords = (data || []).map(record => {
-        console.log('Processing record:', record)
+      console.log('Fetched batch records:', batchData)
+      
+      // If we have batch records, get the product names for each
+      if (batchData && batchData.length > 0) {
+        // Extract unique product IDs
+        const productIds = [...new Set(batchData.map(record => record.product_id))].filter(Boolean)
+        console.log('Unique product IDs:', productIds)
         
-        // Get product name from our products object
-        let productName = 'Unknown Product'
-        if (products[record.product_id]) {
-          productName = products[record.product_id]
-          console.log(`Found product name for ID ${record.product_id}: ${productName}`)
-        } else {
-          console.log(`No product found for ID ${record.product_id}`)
+        if (productIds.length > 0) {
+          // Fetch product details for these IDs
+          const { data: productData, error: productError } = await supabase
+            .from('final_products')
+            .select('id, name')
+            .in('id', productIds)
+          
+          if (productError) {
+            console.error('Error fetching product details:', productError)
+          } else {
+            console.log('Fetched product details:', productData)
+            
+            // Create a mapping of product IDs to names
+            const productMap: Record<string, string> = {}
+            productData?.forEach(product => {
+              productMap[product.id] = product.name
+              console.log(`Mapped product: ${product.id} -> ${product.name}`)
+            })
+            
+            // Assign product names to batch records
+            const formattedRecords = batchData.map(record => {
+              const productName = productMap[record.product_id] || 'Unknown Product'
+              console.log(`Assigned product name for batch ${record.id}: ${productName}`)
+              
+              return {
+                ...record,
+                product_name: productName,
+                status: record.batch_finished ? 'completed' : 'in-progress'
+              }
+            })
+            
+            console.log('Final formatted records:', formattedRecords)
+            setBatchRecords(formattedRecords)
+            setFilteredRecords(formattedRecords)
+            setLoading(false)
+            return
+          }
         }
-        
-        return {
-          ...record,
-          product_name: productName,
-          // Default status based on whether batch is finished
-          status: record.batch_finished ? 'completed' : 'in-progress'
-        }
-      })
-
-      console.log('Formatted records:', formattedRecords)
-
+      }
+      
+      // If we reached here, either there was an error or no product IDs to look up
+      // Just format the batch records without product names
+      const formattedRecords = (batchData || []).map(record => ({
+        ...record,
+        product_name: 'Unknown Product',
+        status: record.batch_finished ? 'completed' : 'in-progress'
+      }))
+      
       setBatchRecords(formattedRecords)
       setFilteredRecords(formattedRecords)
     } catch (error: any) {
@@ -205,7 +233,6 @@ export default function BatchRecordsPage() {
   }
   
   const handleRefresh = async () => {
-    await fetchProducts()
     await fetchBatchRecords()
   }
 
