@@ -31,15 +31,6 @@ interface BatchTraceabilityItem {
   }[]
 }
 
-// Fix the type for ingredients
-interface IngredientData {
-  quantity: number
-  raw_materials: {
-    name?: string
-    unit?: string
-  }
-}
-
 export function BatchTraceabilityComponent() {
   const [batches, setBatches] = useState<BatchTraceabilityItem[]>([])
   const [filteredBatches, setFilteredBatches] = useState<BatchTraceabilityItem[]>([])
@@ -133,11 +124,15 @@ export function BatchTraceabilityComponent() {
           return null
         }
 
-        // Format ingredients - fix type casting
-        const ingredients = (ingredientData || []).map((ingredient: IngredientData) => ({
-          raw_material_name: ingredient.raw_materials?.name || 'Unknown Material',
+        // Format ingredients - using type assertion for the raw materials structure
+        const ingredients = (ingredientData || []).map(ingredient => ({
+          raw_material_name: ingredient.raw_materials && typeof ingredient.raw_materials === 'object' && 'name' in ingredient.raw_materials 
+            ? ingredient.raw_materials.name
+            : 'Unknown Material',
           quantity_used: ingredient.quantity,
-          unit: ingredient.raw_materials?.unit || 'kg'
+          unit: ingredient.raw_materials && typeof ingredient.raw_materials === 'object' && 'unit' in ingredient.raw_materials
+            ? ingredient.raw_materials.unit
+            : 'kg'
         }))
 
         // Split movements into consumed and produced
@@ -145,25 +140,35 @@ export function BatchTraceabilityComponent() {
           .filter(m => m.movement_type === 'manufacturing_consume')
           .map(m => ({
             inventory_id: m.inventory_id,
-            product_name: m.inventory?.product_name || 'Unknown',
+            product_name: m.inventory && typeof m.inventory === 'object' && 'product_name' in m.inventory
+              ? m.inventory.product_name
+              : 'Unknown',
             quantity: Math.abs(m.quantity),
-            unit: m.inventory?.unit || 'kg'
+            unit: m.inventory && typeof m.inventory === 'object' && 'unit' in m.inventory
+              ? m.inventory.unit
+              : 'kg'
           }))
 
         const produced = (movementData || [])
           .filter(m => m.movement_type === 'manufacturing_produce')
           .map(m => ({
             inventory_id: m.inventory_id,
-            product_name: m.inventory?.product_name || 'Unknown',
+            product_name: m.inventory && typeof m.inventory === 'object' && 'product_name' in m.inventory
+              ? m.inventory.product_name
+              : 'Unknown',
             quantity: m.quantity,
-            unit: m.inventory?.unit || 'piece'
+            unit: m.inventory && typeof m.inventory === 'object' && 'unit' in m.inventory
+              ? m.inventory.unit
+              : 'piece'
           }))
 
         return {
           batch_id: batch.id,
           batch_date: batch.date,
           batch_number: batch.product_batch_number || 'No Batch #',
-          product_name: batch.products?.name || 'Unknown Product',
+          product_name: batch.products && typeof batch.products === 'object' && 'name' in batch.products
+            ? batch.products.name
+            : 'Unknown Product',
           quantity_produced: batch.bags_count || 0,
           ingredient_details: ingredients,
           consumed_inventory: consumed,
