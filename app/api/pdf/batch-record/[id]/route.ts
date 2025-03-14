@@ -74,14 +74,9 @@ export async function GET(
     
     // Set up the PDF response
     const chunks: Buffer[] = []
-    let result: Buffer
     
     doc.on('data', (chunk) => {
       chunks.push(chunk)
-    })
-    
-    doc.on('end', () => {
-      result = Buffer.concat(chunks)
     })
     
     // Format batch record for PDF
@@ -243,9 +238,11 @@ export async function GET(
     // Finalize the PDF and end the stream
     doc.end()
     
-    // Wait for the PDF to be generated
-    await new Promise((resolve) => {
-      doc.on('end', resolve)
+    // Wait for the PDF to be generated and collect all chunks
+    const result = await new Promise<Buffer>((resolve) => {
+      doc.on('end', () => {
+        resolve(Buffer.concat(chunks))
+      })
     })
     
     // Return the PDF as a response
