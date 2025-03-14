@@ -1,67 +1,4 @@
-const handleDeleteBatch = (batchId: string) => {
-    setBatchToDelete(batchId)
-    setDeleteModalOpen(true)
-  }
-
-  const confirmDeleteBatch = async () => {
-    if (!batchToDelete) return
-    
-    setDeleteLoading(true)
-    try {
-      // Delete batch ingredients first
-      const { error: ingredientsError } = await supabase
-        .from('batch_ingredients')
-        .delete()
-        .eq('batch_id', batchToDelete)
-      
-      if (ingredientsError) {
-        console.error('Error deleting batch ingredients:', ingredientsError)
-        throw ingredientsError
-      }
-      
-      // Then delete the batch record
-      const { error: batchError } = await supabase
-        .from('batch_manufacturing_records')
-        .delete()
-        .eq('id', batchToDelete)
-      
-      if (batchError) {
-        console.error('Error deleting batch record:', batchError)
-        throw batchError
-      }
-      
-      // Update the UI
-      const updatedRecords = batchRecords.filter(record => record.id !== batchToDelete)
-      setBatchRecords(updatedRecords)
-      setFilteredRecords(filteredRecords.filter(record => record.id !== batchToDelete))
-      
-      // Show success message
-      setSuccessMessage(`Batch record ${batchToDelete} was successfully deleted.`)
-      
-      // Reset state
-      setDeleteModalOpen(false)
-      setBatchToDelete(null)
-      
-      // Hide success message after 5 seconds
-      setTimeout(() => {
-        setSuccessMessage(null)
-      }, 5000)
-    } catch (error) {
-      console.error('Error deleting batch record:', error)
-      setError('Failed to delete batch record. Please try again.')
-    } finally {
-      setDeleteLoading(false)
-    }
-  }
-
-  const cancelDelete = () => {
-    setDeleteModalOpen(false)
-    setBatchToDelete(null)
-  }
-
-  const handleClearSuccess = () => {
-    setSuccessMessage(null)
-  }'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -423,6 +360,71 @@ export default function BatchRecordsPage() {
   
   const handleRefresh = async () => {
     await fetchBatchRecords()
+  }
+
+  const handleDeleteBatch = (batchId: string) => {
+    setBatchToDelete(batchId)
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDeleteBatch = async () => {
+    if (!batchToDelete) return
+    
+    setDeleteLoading(true)
+    try {
+      // Delete batch ingredients first
+      const { error: ingredientsError } = await supabase
+        .from('batch_ingredients')
+        .delete()
+        .eq('batch_id', batchToDelete)
+      
+      if (ingredientsError) {
+        console.error('Error deleting batch ingredients:', ingredientsError)
+        throw ingredientsError
+      }
+      
+      // Then delete the batch record
+      const { error: batchError } = await supabase
+        .from('batch_manufacturing_records')
+        .delete()
+        .eq('id', batchToDelete)
+      
+      if (batchError) {
+        console.error('Error deleting batch record:', batchError)
+        throw batchError
+      }
+      
+      // Update the UI
+      const updatedRecords = batchRecords.filter(record => record.id !== batchToDelete)
+      setBatchRecords(updatedRecords)
+      setFilteredRecords(filteredRecords.filter(record => record.id !== batchToDelete))
+      
+      // Show success message
+      setSuccessMessage(`Batch record ${batchToDelete} was successfully deleted.`)
+      
+      // Reset state
+      setDeleteModalOpen(false)
+      setBatchToDelete(null)
+      
+      // Hide success message after 5 seconds
+      setTimeout(() => {
+        setSuccessMessage(null)
+      }, 5000)
+    } catch (error) {
+      console.error('Error deleting batch record:', error)
+      setError('Failed to delete batch record. Please try again.')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const cancelDelete = () => {
+    setDeleteModalOpen(false)
+    setBatchToDelete(null)
+  }
+
+  const handleClearSuccess = () => {
+    setSuccessMessage(null)
   }
 
   return (
