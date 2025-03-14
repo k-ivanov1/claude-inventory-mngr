@@ -49,8 +49,13 @@ export default function BatchRecordsPage() {
   const supabase = createClientComponentClient()
 
   useEffect(() => {
-    fetchProducts()
-    fetchBatchRecords()
+    const loadData = async () => {
+      // First fetch products, then batch records
+      await fetchProducts()
+      await fetchBatchRecords()
+    }
+    
+    loadData()
   }, [])
 
   useEffect(() => {
@@ -121,13 +126,10 @@ export default function BatchRecordsPage() {
       // Debug logging
       console.log('Fetching batch records...')
       
-      // Fetch batch records with products join
+      // Fetch batch records without join for now
       const { data, error } = await supabase
         .from('batch_manufacturing_records')
-        .select(`
-          *,
-          products:product_id(name)
-        `)
+        .select('*')
         .order('date', { ascending: false })
 
       if (error) {
@@ -142,12 +144,13 @@ export default function BatchRecordsPage() {
       const formattedRecords = (data || []).map(record => {
         console.log('Processing record:', record)
         
-        // Get product name either from join or from our products object
+        // Get product name from our products object
         let productName = 'Unknown Product'
-        if (record.products?.name) {
-          productName = record.products.name
-        } else if (products[record.product_id]) {
+        if (products[record.product_id]) {
           productName = products[record.product_id]
+          console.log(`Found product name for ID ${record.product_id}: ${productName}`)
+        } else {
+          console.log(`No product found for ID ${record.product_id}`)
         }
         
         return {
@@ -201,9 +204,9 @@ export default function BatchRecordsPage() {
     setError(null)
   }
   
-  const handleRefresh = () => {
-    fetchProducts()
-    fetchBatchRecords()
+  const handleRefresh = async () => {
+    await fetchProducts()
+    await fetchBatchRecords()
   }
 
   return (
