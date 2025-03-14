@@ -121,37 +121,127 @@ export default function BatchRecordsPage() {
     setLoading(true)
     setError(null)
     try {
-      console.log('TRYING NEW DIRECT APPROACH - fetching batch records with product data...')
+      console.log('INVESTIGATING DATABASE STRUCTURE...')
       
-      // Let's try a new approach - using a direct SQL query to get the product names
-      const { data, error } = await supabase
-        .rpc('get_batch_records_with_product_names')
+      // First, get one sample batch record to examine the product_id
+      const { data: sampleBatch, error: sampleError } = await supabase
+        .from('batch_manufacturing_records')
+        .select('*')
+        .limit(1)
       
-      if (error) {
-        console.error('Failed with RPC approach, falling back to standard query:', error)
+      if (sampleError) {
+        console.error('Error fetching sample batch:', sampleError)
+      } else if (sampleBatch && sampleBatch.length > 0) {
+        const sample = sampleBatch[0]
+        console.log('Sample batch record:', sample)
+        console.log('Product ID in sample:', sample.product_id, 'Type:', typeof sample.product_id)
         
-        // FALLBACK - try the simplest possible approach
+        // Now try to find the corresponding product
+        const { data: matchingProduct, error: matchError } = await supabase
+          .from('final_products')
+          .select('*')
+          .eq('id', sample.product_id)
+        
+        console.log('Tried to match product with ID:', sample.product_id)
+        
+        if (matchError) {
+          console.error('Error finding matching product:', matchError)
+        } else {
+          console.log('Matching product result:', matchingProduct)
+          
+          // Also get all products to compare
+          const { data: allProducts, error: productsError } = await supabase
+            .from('final_products')
+            .select('*')
+          
+          if (productsError) {
+            console.error('Error fetching all products:', productsError)
+          } else {
+            console.log('All products:', allProducts)
+            
+            // Try to find a match manually
+            const manualMatch = allProducts?.find(p => String(p.id) === String(sample.product_id))
+            console.log('Manual match result:', manualMatch)
+          }
+        }
+      }
+      
+      // Try several join approaches
+      console.log('TRYING DIFFERENT JOIN APPROACHES...')
+      
+      // 1. Using direct foreign key relationship
+      console.log('Approach 1: Direct foreign key relationship')
+      const { data: approach1Data, error: approach1Error } = await supabase
+        .from('batch_manufacturing_records')
+        .select(`
+          *,
+          final_products(id, name)
+        `)
+        .limit(5)
+      
+      console.log('Approach 1 result:', approach1Data)
+      console.log('Approach 1 error:', approach1Error)
+      
+      // 2. Using named foreign key
+      console.log('Approach 2: Named foreign key')
+      const { data: approach2Data, error: approach2Error } = await supabase
+        .from('batch_manufacturing_records')
+        .select(`
+          *,
+          products:product_id(id, name)
+        `)
+        .limit(5)
+      
+      console.log('Approach 2 result:', approach2Data)
+      console.log('Approach 2 error:', approach2Error)
+      
+      // 3. Using explicit join
+      console.log('Approach 3: Explicit join')
+      const { data: approach3Data, error: approach3Error } = await supabase
+        .from('batch_manufacturing_records')
+        .select(`
+          *,
+          product_name:final_products!inner(name)
+        `)
+        .limit(5)
+      
+      console.log('Approach 3 result:', approach3Data)
+      console.log('Approach 3 error:', approach3Error)
+      
+      // After investigation, proceed with the most promising approach
+      let productNameField = ''
+      if (!approach1Error && approach1Data && approach1Data[0]?.final_products?.name) {
+        console.log('Using approach 1 for full fetch')
+        productNameField = 'final_products(name)'
+      } else if (!approach2Error && approach2Data && approach2Data[0]?.products?.name) {
+        console.log('Using approach 2 for full fetch')
+        productNameField = 'products:product_id(name)'
+      } else {
+        console.log('Using fallback approach for full fetch')
+        productNameField = ''
+      }
+      
+      // Now fetch all records using the approach that worked
+      if (productNameField) {
         const { data: batchData, error: batchError } = await supabase
           .from('batch_manufacturing_records')
-          .select(`
-            *,
-            final_products!product_id(name)
-          `)
+          .select(`*, ${productNameField}`)
           .order('date', { ascending: false })
         
         if (batchError) {
-          console.error('Error with fallback approach too:', batchError)
+          console.error('Error fetching batch records with join:', batchError)
           throw batchError
         }
         
-        console.log('Fetched batch records with products join:', batchData)
+        console.log('Fetched all batch records with product names:', batchData)
         
-        // Format the data
-        const formattedRecords = (batchData || []).map(record => {
+        // Format the records based on which approach worked
+        const formattedRecords = (batchData || []).map((record: any) => {
           let productName = 'Unknown Product'
           
-          // Try to get product name from the join
-          if (record.final_products && record.final_products.name) {
+          if (record.products?.name) {
+            productName = record.products.name
+          } else if (record.final_products?.name) {
             productName = record.final_products.name
           }
           
@@ -165,52 +255,38 @@ export default function BatchRecordsPage() {
         setBatchRecords(formattedRecords)
         setFilteredRecords(formattedRecords)
       } else {
-        console.log('Success with RPC approach:', data)
-        
-        // Format the data from RPC
-        const formattedRecords = (data || []).map(record => ({
-          ...record,
-          status: record.batch_finished ? 'completed' : 'in-progress'
-        }))
-        
-        setBatchRecords(formattedRecords)
-        setFilteredRecords(formattedRecords)
-      }
-    } catch (error: any) {
-      console.error('Error fetching batch records:', error)
-      
-      // LAST RESORT - try the most basic query
-      try {
-        console.log('Trying last resort approach...')
-        const { data: rawData, error: rawError } = await supabase
+        // Fallback to getting products separately
+        const { data: batchData, error: batchError } = await supabase
           .from('batch_manufacturing_records')
           .select('*')
           .order('date', { ascending: false })
         
-        if (rawError) {
-          console.error('Even basic query failed:', rawError)
-          setError('Failed to load batch records. Please try again.')
-          return
+        if (batchError) {
+          console.error('Error fetching batch records:', batchError)
+          throw batchError
         }
         
-        console.log('Basic query succeeded, now trying to get product names separately')
-        
-        // Try to fetch products separately
-        const { data: products } = await supabase
+        // Get all products to map IDs to names
+        const { data: products, error: productsError } = await supabase
           .from('final_products')
           .select('id, name')
         
-        console.log('Products:', products)
+        if (productsError) {
+          console.error('Error fetching products:', productsError)
+        }
         
-        // Create a map of product IDs to names
         const productMap: Record<string, string> = {}
-        products?.forEach(product => {
+        products?.forEach((product: any) => {
           productMap[product.id] = product.name
+          // Also add string version as fallback
+          productMap[String(product.id)] = product.name
         })
         
-        // Format the data
-        const formattedRecords = (rawData || []).map(record => {
-          const productName = productMap[record.product_id] || 'Unknown Product'
+        const formattedRecords = (batchData || []).map((record: any) => {
+          // Try both the direct ID and string version
+          const productName = productMap[record.product_id] || 
+                             productMap[String(record.product_id)] || 
+                             'Unknown Product'
           
           return {
             ...record,
@@ -221,9 +297,23 @@ export default function BatchRecordsPage() {
         
         setBatchRecords(formattedRecords)
         setFilteredRecords(formattedRecords)
-      } catch (lastError) {
-        console.error('Last resort approach failed:', lastError)
-        setError('Failed to load batch records. Please try again.')
+      }
+    } catch (error: any) {
+      console.error('Error fetching batch records:', error)
+      setError('Failed to load batch records. Please try again.')
+      
+      // Emergency fallback
+      try {
+        const { data, error: fallbackError } = await supabase
+          .from('batch_manufacturing_records')
+          .select('*')
+        
+        if (!fallbackError) {
+          setBatchRecords(data || [])
+          setFilteredRecords(data || [])
+        }
+      } catch (e) {
+        console.error('Even emergency fallback failed:', e)
       }
     } finally {
       setLoading(false)
