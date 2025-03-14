@@ -16,6 +16,8 @@ interface InventoryItem {
   reorder_point: number
   supplier?: string
   last_updated?: string
+  is_recipe_based?: boolean
+  is_final_product?: boolean
 }
 
 // Manual Adjustment Modal Component
@@ -41,39 +43,39 @@ function ManualAdjustmentModal({ item, onClose, onSubmit }: ManualAdjustmentModa
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-        <h3 className="text-lg font-semibold mb-4">Manual Inventory Adjustment</h3>
+    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75 flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Manual Inventory Adjustment</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Adjustment Type</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Adjustment Type</label>
             <select
               value={adjustmentType}
               onChange={(e) => setAdjustmentType(e.target.value as 'add' | 'remove')}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             >
               <option value="add">Add Stock</option>
               <option value="remove">Remove Stock</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Quantity</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</label>
             <input
               type="number"
               value={quantity}
               onChange={(e) => setQuantity(parseFloat(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               min="1"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Reason</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Reason</label>
             <input
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             />
           </div>
@@ -81,7 +83,7 @@ function ManualAdjustmentModal({ item, onClose, onSubmit }: ManualAdjustmentModa
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 border"
+              className="rounded-md bg-white dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
             >
               Cancel
             </button>
@@ -116,7 +118,9 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
     unit: item?.unit || 'piece',
     unit_price: item?.unit_price || 0,
     reorder_point: item?.reorder_point || 5,
-    supplier: item?.supplier || ''
+    supplier: item?.supplier || '',
+    is_recipe_based: item?.is_recipe_based || false,
+    is_final_product: item?.is_final_product || false
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -127,7 +131,10 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    if (type === 'number') {
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked
+      setFormData({ ...formData, [name]: checked })
+    } else if (type === 'number') {
       setFormData({ ...formData, [name]: parseFloat(value) || 0 })
     } else {
       setFormData({ ...formData, [name]: value })
@@ -185,7 +192,9 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
             unit: formData.unit,
             unit_price: formData.unit_price,
             reorder_point: formData.reorder_point,
-            supplier: formData.supplier
+            supplier: formData.supplier,
+            is_recipe_based: formData.is_recipe_based,
+            is_final_product: formData.is_final_product
           })
           .eq('id', item.id)
         if (error) throw error
@@ -200,7 +209,9 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
             unit: formData.unit,
             unit_price: formData.unit_price,
             reorder_point: formData.reorder_point,
-            supplier: formData.supplier
+            supplier: formData.supplier,
+            is_recipe_based: formData.is_recipe_based,
+            is_final_product: formData.is_final_product
           })
         if (error) throw error
       }
@@ -214,10 +225,10 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75 flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
         {error && (
-          <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative mb-4" role="alert">
             <span className="block sm:inline">{error}</span>
             <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setError(null)}>
               <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -227,23 +238,23 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
             </span>
           </div>
         )}
-        <h3 className="text-lg font-semibold mb-4">{item ? 'Edit Inventory Item' : 'Add New Inventory Item'}</h3>
+        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">{item ? 'Edit Inventory Item' : 'Add New Inventory Item'}</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Product Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Name</label>
             <input
               type="text"
               name="product_name"
               value={formData.product_name}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             />
           </div>
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">SKU</label>
-              <button type="button" onClick={generateSKU} className="text-xs text-indigo-600">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">SKU</label>
+              <button type="button" onClick={generateSKU} className="text-xs text-indigo-600 dark:text-indigo-400">
                 Generate SKU
               </button>
             </div>
@@ -252,14 +263,14 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
               name="sku"
               value={formData.sku}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             />
           </div>
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">Category</label>
-              <button type="button" onClick={() => setShowAddCategory(!showAddCategory)} className="text-xs text-indigo-600">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
+              <button type="button" onClick={() => setShowAddCategory(!showAddCategory)} className="text-xs text-indigo-600 dark:text-indigo-400">
                 {showAddCategory ? 'Cancel' : 'Add New Category'}
               </button>
             </div>
@@ -270,7 +281,7 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   placeholder="New category name"
-                  className="block flex-grow rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  className="block flex-grow rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 />
                 <button
                   type="button"
@@ -285,7 +296,7 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               >
                 {categories.map((category) => (
@@ -297,24 +308,24 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Stock Level</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Stock Level</label>
             <input
               type="number"
               name="stock_level"
               value={formData.stock_level}
               onChange={handleChange}
               min="0"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Unit</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Unit</label>
             <select
               name="unit"
               value={formData.unit}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             >
               <option value="piece">Piece</option>
@@ -327,7 +338,7 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Unit Price (£)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Unit Price (£)</label>
             <input
               type="number"
               name="unit_price"
@@ -335,37 +346,65 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
               onChange={handleChange}
               min="0"
               step="0.01"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Reorder Point</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Reorder Point</label>
             <input
               type="number"
               name="reorder_point"
               value={formData.reorder_point}
               onChange={handleChange}
               min="0"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Supplier (Optional)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Supplier (Optional)</label>
             <input
               type="text"
               name="supplier"
               value={formData.supplier}
               onChange={handleChange}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             />
+          </div>
+          <div className="flex flex-col space-y-2">
+            <div className="flex items-center">
+              <input
+                id="is_recipe_based"
+                name="is_recipe_based"
+                type="checkbox"
+                checked={formData.is_recipe_based}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <label htmlFor="is_recipe_based" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                Recipe Based Item
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                id="is_final_product"
+                name="is_final_product"
+                type="checkbox"
+                checked={formData.is_final_product}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <label htmlFor="is_final_product" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                Final Product
+              </label>
+            </div>
           </div>
           <div className="flex justify-end gap-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              className="rounded-md bg-white dark:bg-gray-700 px-3.5 py-2.5 text-sm font-semibold text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
               disabled={loading}
             >
               Cancel
@@ -384,7 +423,6 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
   )
 }
 
-// --- InventoryPage Component (Only Default Export) ---
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [filteredInventory, setFilteredInventory] = useState<InventoryItem[]>([])
@@ -396,6 +434,8 @@ export default function InventoryPage() {
   const [error, setError] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
+  const [showItemTypeFilter, setShowItemTypeFilter] = useState(false)
+  const [selectedItemType, setSelectedItemType] = useState<string>('all')
 
   const supabase = createClientComponentClient()
 
@@ -406,18 +446,33 @@ export default function InventoryPage() {
 
   useEffect(() => {
     let result = inventory
+    // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
-      result = result.filter(item => 
+      result = result.filter(item =>
         item.product_name.toLowerCase().includes(term) ||
         item.sku.toLowerCase().includes(term)
       )
     }
+    
+    // Apply category filter
     if (selectedCategories.length > 0) {
       result = result.filter(item => selectedCategories.includes(item.category))
     }
+    
+    // Apply item type filter
+    if (selectedItemType !== 'all') {
+      if (selectedItemType === 'raw') {
+        result = result.filter(item => !item.is_recipe_based && !item.is_final_product)
+      } else if (selectedItemType === 'recipe') {
+        result = result.filter(item => item.is_recipe_based && !item.is_final_product)
+      } else if (selectedItemType === 'final') {
+        result = result.filter(item => item.is_final_product)
+      }
+    }
+    
     setFilteredInventory(result)
-  }, [searchTerm, inventory, selectedCategories])
+  }, [searchTerm, inventory, selectedCategories, selectedItemType])
 
   const fetchInventoryItems = async () => {
     setLoading(true)
@@ -439,6 +494,17 @@ export default function InventoryPage() {
 
   const fetchCategories = async () => {
     try {
+      // First try to get from product_categories table
+      const { data: categoryData, error: categoryError } = await supabase
+        .from('product_categories')
+        .select('name')
+      
+      if (!categoryError && categoryData && categoryData.length > 0) {
+        setCategories(categoryData.map(c => c.name))
+        return
+      }
+      
+      // Fallback to getting unique categories from inventory
       const { data, error } = await supabase
         .from('inventory')
         .select('category')
@@ -474,6 +540,12 @@ export default function InventoryPage() {
       }
     }
   }
+  
+  const handleManualAdjustment = async (item: InventoryItem) => {
+    // Implement this function if you want to add manual inventory adjustment functionality
+    setEditingItem(item)
+    // This would typically show a modal for adjusting stock levels
+  }
 
   const totalInventoryValue = filteredInventory.reduce(
     (total, item) => total + (item.stock_level * item.unit_price),
@@ -485,7 +557,7 @@ export default function InventoryPage() {
   return (
     <div className="space-y-8">
       {error && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative" role="alert">
           <span className="block sm:inline">{error}</span>
           <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setError(null)}>
             <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -498,12 +570,12 @@ export default function InventoryPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Inventory Management</h2>
-          <p className="text-gray-600">Track and manage your product inventory</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Inventory Management</h2>
+          <p className="text-gray-600 dark:text-gray-300">Track and manage your product inventory</p>
         </div>
         <div className="flex items-center gap-x-4">
-          <div className="text-sm font-medium text-gray-700">
-            Total Value: <span className="ml-2 text-indigo-600">£{totalInventoryValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Total Value: <span className="ml-2 text-indigo-600 dark:text-indigo-400">£{totalInventoryValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <button
             onClick={() => {
@@ -519,31 +591,69 @@ export default function InventoryPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0 bg-indigo-500 rounded-md p-3">
                 <Plus className="h-6 w-6 text-white" />
               </div>
               <div className="ml-5 w-0 flex-1">
-                <dt className="text-sm font-medium text-gray-500 truncate">Total Items</dt>
+                <dt className="text-sm font-medium text-<dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Items</dt>
                 <dd className="flex items-baseline">
-                  <span className="text-2xl font-semibold text-gray-900">{totalItems}</span>
+                  <span className="text-2xl font-semibold text-gray-900 dark:text-white">{totalItems}</span>
                 </dd>
               </div>
             </div>
           </div>
         </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
                 <AlertTriangle className="h-6 w-6 text-white" />
               </div>
               <div className="ml-5 w-0 flex-1">
-                <dt className="text-sm font-medium text-gray-500 truncate">Low Stock Items</dt>
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Low Stock Items</dt>
                 <dd className="flex items-baseline">
-                  <span className="text-2xl font-semibold text-red-600">{lowStockItems}</span>
+                  <span className="text-2xl font-semibold text-red-600 dark:text-red-400">{lowStockItems}</span>
+                </dd>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Final Products</dt>
+                <dd className="flex items-baseline">
+                  <span className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    {filteredInventory.filter(item => item.is_final_product).length}
+                  </span>
+                </dd>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Raw Materials</dt>
+                <dd className="flex items-baseline">
+                  <span className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    {filteredInventory.filter(item => !item.is_recipe_based && !item.is_final_product).length}
+                  </span>
                 </dd>
               </div>
             </div>
@@ -551,34 +661,34 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
         <div className="relative flex-grow">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
+            <Search className="h-5 w-5 text-gray-400 dark:text-gray-500" />
           </div>
           <input
             type="text"
             placeholder="Search inventory..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           />
         </div>
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowCategoryFilter(!showCategoryFilter)}
-            className="inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             <Filter className="h-4 w-4 mr-2" />
             Categories
             <ChevronDown className="h-4 w-4 ml-2" />
           </button>
           {showCategoryFilter && (
-            <div className="absolute z-10 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+            <div className="absolute z-10 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
               <div className="py-1" role="menu" aria-orientation="vertical">
                 {categories.map((category) => (
-                  <div key={category} className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <div key={category} className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                     <input
                       type="checkbox"
                       id={`category-${category}`}
@@ -586,7 +696,7 @@ export default function InventoryPage() {
                       onChange={() => toggleCategoryFilter(category)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded mr-2"
                     />
-                    <label htmlFor={`category-${category}`} className="ml-2 block text-sm text-gray-700">
+                    <label htmlFor={`category-${category}`} className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                       {category.charAt(0).toUpperCase() + category.slice(1)}
                     </label>
                   </div>
@@ -595,49 +705,119 @@ export default function InventoryPage() {
             </div>
           )}
         </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowItemTypeFilter(!showItemTypeFilter)}
+            className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Item Type
+            <ChevronDown className="h-4 w-4 ml-2" />
+          </button>
+          {showItemTypeFilter && (
+            <div className="absolute z-10 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
+              <div className="py-1" role="menu" aria-orientation="vertical">
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <input
+                    type="radio"
+                    id="type-all"
+                    name="item-type"
+                    checked={selectedItemType === 'all'}
+                    onChange={() => setSelectedItemType('all')}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 mr-2"
+                  />
+                  <label htmlFor="type-all" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    All Items
+                  </label>
+                </div>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <input
+                    type="radio"
+                    id="type-raw"
+                    name="item-type"
+                    checked={selectedItemType === 'raw'}
+                    onChange={() => setSelectedItemType('raw')}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 mr-2"
+                  />
+                  <label htmlFor="type-raw" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    Raw Materials
+                  </label>
+                </div>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <input
+                    type="radio"
+                    id="type-recipe"
+                    name="item-type"
+                    checked={selectedItemType === 'recipe'}
+                    onChange={() => setSelectedItemType('recipe')}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 mr-2"
+                  />
+                  <label htmlFor="type-recipe" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    Recipe Based Items
+                  </label>
+                </div>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <input
+                    type="radio"
+                    id="type-final"
+                    name="item-type"
+                    checked={selectedItemType === 'final'}
+                    onChange={() => setSelectedItemType('final')}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 mr-2"
+                  />
+                  <label htmlFor="type-final" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    Final Products
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Name</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Level</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reorder Point</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Product Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stock Level</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Unit Price</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Reorder Point</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Supplier</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     Loading inventory...
                   </td>
                 </tr>
               ) : filteredInventory.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     No inventory items found.
                   </td>
                 </tr>
               ) : (
                 filteredInventory.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product_name}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{item.sku}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{item.category}</td>
+                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{item.product_name}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.sku}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.category}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
                         item.stock_level <= item.reorder_point
-                          ? 'bg-red-50 text-red-700'
+                          ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                           : item.stock_level <= item.reorder_point * 1.5
-                          ? 'bg-yellow-50 text-yellow-700'
-                          : 'bg-green-50 text-green-700'
+                          ? 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                          : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                       }`}>
                         {item.stock_level} {item.unit}
                         {item.stock_level <= item.reorder_point && (
@@ -645,9 +825,24 @@ export default function InventoryPage() {
                         )}
                       </span>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">£{item.unit_price.toFixed(2)}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{item.reorder_point}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{item.supplier || '-'}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">£{item.unit_price.toFixed(2)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        item.is_final_product
+                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                          : item.is_recipe_based
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
+                      }`}>
+                        {item.is_final_product 
+                          ? 'Final Product' 
+                          : item.is_recipe_based 
+                            ? 'Recipe Based' 
+                            : 'Raw Material'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.reorder_point}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.supplier || '-'}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-x-3">
                         <button
@@ -655,13 +850,13 @@ export default function InventoryPage() {
                             setEditingItem(item)
                             setShowAddForm(true)
                           }}
-                          className="text-indigo-600 hover:text-indigo-900"
+                          className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteItem(item.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
