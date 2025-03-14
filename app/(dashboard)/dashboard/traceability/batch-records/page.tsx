@@ -641,13 +641,7 @@ export default function BatchRecordsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-3">
-                        <Link 
-                          href={`/dashboard/traceability/batch-records/${record.id}`}
-                          className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
-                          title="View batch record"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
+                        {/* View icon removed as requested */}
                         <Link 
                           href={`/dashboard/traceability/batch-records/edit/${record.id}`}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
@@ -662,12 +656,14 @@ export default function BatchRecordsPage() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
-                        <button 
+                        <Link 
+                          href={`/api/pdf/batch-record/${record.id}`}
+                          target="_blank"
                           className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300"
-                          title="Download batch record"
+                          title="Download batch record PDF"
                         >
                           <Download className="h-4 w-4" />
-                        </button>
+                        </Link>
                       </div>
                     </td>
                   </tr>
