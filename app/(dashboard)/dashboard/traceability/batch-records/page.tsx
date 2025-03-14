@@ -1,4 +1,67 @@
-'use client'
+const handleDeleteBatch = (batchId: string) => {
+    setBatchToDelete(batchId)
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDeleteBatch = async () => {
+    if (!batchToDelete) return
+    
+    setDeleteLoading(true)
+    try {
+      // Delete batch ingredients first
+      const { error: ingredientsError } = await supabase
+        .from('batch_ingredients')
+        .delete()
+        .eq('batch_id', batchToDelete)
+      
+      if (ingredientsError) {
+        console.error('Error deleting batch ingredients:', ingredientsError)
+        throw ingredientsError
+      }
+      
+      // Then delete the batch record
+      const { error: batchError } = await supabase
+        .from('batch_manufacturing_records')
+        .delete()
+        .eq('id', batchToDelete)
+      
+      if (batchError) {
+        console.error('Error deleting batch record:', batchError)
+        throw batchError
+      }
+      
+      // Update the UI
+      const updatedRecords = batchRecords.filter(record => record.id !== batchToDelete)
+      setBatchRecords(updatedRecords)
+      setFilteredRecords(filteredRecords.filter(record => record.id !== batchToDelete))
+      
+      // Show success message
+      setSuccessMessage(`Batch record ${batchToDelete} was successfully deleted.`)
+      
+      // Reset state
+      setDeleteModalOpen(false)
+      setBatchToDelete(null)
+      
+      // Hide success message after 5 seconds
+      setTimeout(() => {
+        setSuccessMessage(null)
+      }, 5000)
+    } catch (error) {
+      console.error('Error deleting batch record:', error)
+      setError('Failed to delete batch record. Please try again.')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const cancelDelete = () => {
+    setDeleteModalOpen(false)
+    setBatchToDelete(null)
+  }
+
+  const handleClearSuccess = () => {
+    setSuccessMessage(null)
+  }'use client'
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -14,7 +77,10 @@ import {
   Download,
   Plus,
   RefreshCw,
-  X
+  X,
+  Edit,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
@@ -45,6 +111,10 @@ export default function BatchRecordsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [products, setProducts] = useState<Record<string, string>>({})
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [batchToDelete, setBatchToDelete] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const supabase = createClientComponentClient()
 
@@ -368,6 +438,17 @@ export default function BatchRecordsPage() {
         </div>
       )}
 
+      {successMessage && (
+        <div className="bg-green-50 dark:bg-green-900 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-200 px-4 py-3 rounded relative" role="alert">
+          <div className="flex items-center justify-between">
+            <span className="block sm:inline">{successMessage}</span>
+            <button onClick={handleClearSuccess} className="text-green-700 dark:text-green-200">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Batch Manufacturing Records</h2>
@@ -561,9 +642,24 @@ export default function BatchRecordsPage() {
                         <Link 
                           href={`/dashboard/traceability/batch-records/${record.id}`}
                           className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
+                          title="View batch record"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
+                        <Link 
+                          href={`/dashboard/traceability/batch-records/edit/${record.id}`}
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+                          title="Edit batch record"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Link>
+                        <button 
+                          onClick={() => handleDeleteBatch(record.id)}
+                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                          title="Delete batch record"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                         <button 
                           className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300"
                           title="Download batch record"
@@ -579,6 +675,44 @@ export default function BatchRecordsPage() {
           </table>
         </div>
       </div>
+      
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full">
+            <div className="mb-4 flex items-center text-amber-500 dark:text-amber-400">
+              <AlertTriangle className="h-6 w-6 mr-2" />
+              <h3 className="text-lg font-medium">Confirm Deletion</h3>
+            </div>
+            <p className="mb-6 text-gray-600 dark:text-gray-300">
+              Are you sure you want to delete this batch record? This action cannot be undone and will remove all associated data.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteBatch}
+                className="px-4 py-2 bg-red-600 rounded-md text-white hover:bg-red-700 focus:outline-none"
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? (
+                  <div className="flex items-center">
+                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                    Deleting...
+                  </div>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
