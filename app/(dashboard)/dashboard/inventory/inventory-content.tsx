@@ -265,8 +265,7 @@ function InventoryItemModal({ item, categories, onClose, onSubmit }: InventoryIt
               onChange={handleChange}
               className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
-            />
-          </div>
+            /></div>
           <div>
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
@@ -598,7 +597,7 @@ export default function InventoryPage() {
                 <Plus className="h-6 w-6 text-white" />
               </div>
               <div className="ml-5 w-0 flex-1">
-                <dt className="text-sm font-medium text-<dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Items</dt>
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Items</dt>
                 <dd className="flex items-baseline">
                   <span className="text-2xl font-semibold text-gray-900 dark:text-white">{totalItems}</span>
                 </dd>
@@ -797,8 +796,7 @@ export default function InventoryPage() {
                 <tr>
                   <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     Loading inventory...
-                  </td>
-                </tr>
+                  </td></tr>
               ) : filteredInventory.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
