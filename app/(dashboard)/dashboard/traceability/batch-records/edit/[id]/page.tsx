@@ -408,7 +408,7 @@ export default function EditBatchRecordPage() {
         }
       }
 
-      setSuccessMessage('Batch record updatesetSuccessMessage('Batch record updated successfully!')
+      setSuccessMessage('Batch record updated successfully!')
       
       // Hide success message after 5 seconds
       setTimeout(() => {
