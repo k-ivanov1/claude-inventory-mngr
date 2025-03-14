@@ -94,14 +94,12 @@ export default function BatchRecordsPage() {
     setFilteredRecords(result)
   }, [searchTerm, batchRecords, sortField, sortDirection, filterStatus])
 
-// Fetch all batch records without the join
-const { data, error } = await supabase
-  .from('batch_manufacturing_records')
-  .select(`
-    *,
-    products:product_id(name)
-  `)
-  .order('date', { ascending: false })
+  // Fetch product names to use for lookups
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('final_products')
+        .select('id, name')
       
       if (error) throw error
 
@@ -123,10 +121,13 @@ const { data, error } = await supabase
       // Debug logging
       console.log('Fetching batch records...')
       
-      // Fetch all batch records without the join
+      // Fetch batch records with products join
       const { data, error } = await supabase
         .from('batch_manufacturing_records')
-        .select('*')
+        .select(`
+          *,
+          products:product_id(name)
+        `)
         .order('date', { ascending: false })
 
       if (error) {
