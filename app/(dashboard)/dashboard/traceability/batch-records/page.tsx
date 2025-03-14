@@ -121,81 +121,110 @@ export default function BatchRecordsPage() {
     setLoading(true)
     setError(null)
     try {
-      // Debug logging
-      console.log('Fetching batch records...')
+      console.log('TRYING NEW DIRECT APPROACH - fetching batch records with product data...')
       
-      // First, get all batch records
-      const { data: batchData, error: batchError } = await supabase
-        .from('batch_manufacturing_records')
-        .select('*')
-        .order('date', { ascending: false })
-
-      if (batchError) {
-        console.error('Supabase error fetching batches:', batchError)
-        throw batchError
-      }
-
-      console.log('Fetched batch records:', batchData)
+      // Let's try a new approach - using a direct SQL query to get the product names
+      const { data, error } = await supabase
+        .rpc('get_batch_records_with_product_names')
       
-      // If we have batch records, get the product names for each
-      if (batchData && batchData.length > 0) {
-        // Extract unique product IDs
-        const productIds = [...new Set(batchData.map(record => record.product_id))].filter(Boolean)
-        console.log('Unique product IDs:', productIds)
+      if (error) {
+        console.error('Failed with RPC approach, falling back to standard query:', error)
         
-        if (productIds.length > 0) {
-          // Fetch product details for these IDs
-          const { data: productData, error: productError } = await supabase
-            .from('final_products')
-            .select('id, name')
-            .in('id', productIds)
-          
-          if (productError) {
-            console.error('Error fetching product details:', productError)
-          } else {
-            console.log('Fetched product details:', productData)
-            
-            // Create a mapping of product IDs to names
-            const productMap: Record<string, string> = {}
-            productData?.forEach(product => {
-              productMap[product.id] = product.name
-              console.log(`Mapped product: ${product.id} -> ${product.name}`)
-            })
-            
-            // Assign product names to batch records
-            const formattedRecords = batchData.map(record => {
-              const productName = productMap[record.product_id] || 'Unknown Product'
-              console.log(`Assigned product name for batch ${record.id}: ${productName}`)
-              
-              return {
-                ...record,
-                product_name: productName,
-                status: record.batch_finished ? 'completed' : 'in-progress'
-              }
-            })
-            
-            console.log('Final formatted records:', formattedRecords)
-            setBatchRecords(formattedRecords)
-            setFilteredRecords(formattedRecords)
-            setLoading(false)
-            return
-          }
+        // FALLBACK - try the simplest possible approach
+        const { data: batchData, error: batchError } = await supabase
+          .from('batch_manufacturing_records')
+          .select(`
+            *,
+            final_products!product_id(name)
+          `)
+          .order('date', { ascending: false })
+        
+        if (batchError) {
+          console.error('Error with fallback approach too:', batchError)
+          throw batchError
         }
+        
+        console.log('Fetched batch records with products join:', batchData)
+        
+        // Format the data
+        const formattedRecords = (batchData || []).map(record => {
+          let productName = 'Unknown Product'
+          
+          // Try to get product name from the join
+          if (record.final_products && record.final_products.name) {
+            productName = record.final_products.name
+          }
+          
+          return {
+            ...record,
+            product_name: productName,
+            status: record.batch_finished ? 'completed' : 'in-progress'
+          }
+        })
+        
+        setBatchRecords(formattedRecords)
+        setFilteredRecords(formattedRecords)
+      } else {
+        console.log('Success with RPC approach:', data)
+        
+        // Format the data from RPC
+        const formattedRecords = (data || []).map(record => ({
+          ...record,
+          status: record.batch_finished ? 'completed' : 'in-progress'
+        }))
+        
+        setBatchRecords(formattedRecords)
+        setFilteredRecords(formattedRecords)
       }
-      
-      // If we reached here, either there was an error or no product IDs to look up
-      // Just format the batch records without product names
-      const formattedRecords = (batchData || []).map(record => ({
-        ...record,
-        product_name: 'Unknown Product',
-        status: record.batch_finished ? 'completed' : 'in-progress'
-      }))
-      
-      setBatchRecords(formattedRecords)
-      setFilteredRecords(formattedRecords)
     } catch (error: any) {
       console.error('Error fetching batch records:', error)
-      setError('Failed to load batch records. Please try again.')
+      
+      // LAST RESORT - try the most basic query
+      try {
+        console.log('Trying last resort approach...')
+        const { data: rawData, error: rawError } = await supabase
+          .from('batch_manufacturing_records')
+          .select('*')
+          .order('date', { ascending: false })
+        
+        if (rawError) {
+          console.error('Even basic query failed:', rawError)
+          setError('Failed to load batch records. Please try again.')
+          return
+        }
+        
+        console.log('Basic query succeeded, now trying to get product names separately')
+        
+        // Try to fetch products separately
+        const { data: products } = await supabase
+          .from('final_products')
+          .select('id, name')
+        
+        console.log('Products:', products)
+        
+        // Create a map of product IDs to names
+        const productMap: Record<string, string> = {}
+        products?.forEach(product => {
+          productMap[product.id] = product.name
+        })
+        
+        // Format the data
+        const formattedRecords = (rawData || []).map(record => {
+          const productName = productMap[record.product_id] || 'Unknown Product'
+          
+          return {
+            ...record,
+            product_name: productName,
+            status: record.batch_finished ? 'completed' : 'in-progress'
+          }
+        })
+        
+        setBatchRecords(formattedRecords)
+        setFilteredRecords(formattedRecords)
+      } catch (lastError) {
+        console.error('Last resort approach failed:', lastError)
+        setError('Failed to load batch records. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
