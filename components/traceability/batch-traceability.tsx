@@ -31,6 +31,15 @@ interface BatchTraceabilityItem {
   }[]
 }
 
+// Fix the type for ingredients
+interface IngredientData {
+  quantity: number
+  raw_materials: {
+    name?: string
+    unit?: string
+  }
+}
+
 export function BatchTraceabilityComponent() {
   const [batches, setBatches] = useState<BatchTraceabilityItem[]>([])
   const [filteredBatches, setFilteredBatches] = useState<BatchTraceabilityItem[]>([])
@@ -124,8 +133,8 @@ export function BatchTraceabilityComponent() {
           return null
         }
 
-        // Format ingredients
-        const ingredients = (ingredientData || []).map(ingredient => ({
+        // Format ingredients - fix type casting
+        const ingredients = (ingredientData || []).map((ingredient: IngredientData) => ({
           raw_material_name: ingredient.raw_materials?.name || 'Unknown Material',
           quantity_used: ingredient.quantity,
           unit: ingredient.raw_materials?.unit || 'kg'
