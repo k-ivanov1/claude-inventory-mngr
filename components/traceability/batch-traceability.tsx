@@ -163,7 +163,6 @@ export function BatchTraceabilityComponent() {
       }))
 
       // Filter out null values (failed fetches)
-      const validBatches = batchesWithDetails.// Filter out null values (failed fetches)
       const validBatches = batchesWithDetails.filter(batch => batch !== null) as BatchTraceabilityItem[]
 
       setBatches(validBatches)
