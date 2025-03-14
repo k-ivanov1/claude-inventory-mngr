@@ -337,6 +337,13 @@ export default function BatchRecordPage() {
     setError(null)
     
     try {
+      console.log("Saving batch info with data:", {
+        date: formData.date,
+        product_id: formData.product_id,
+        product_batch_number: formData.product_batch_number,
+        product_best_before_date: formData.product_best_before_date
+      });
+
       // Calculate batch size from bags_count and bag_size
       const bags = parseFloat(formData.bags_count) || 0
       const bagSize = parseFloat(formData.bag_size) || 0
@@ -356,15 +363,22 @@ export default function BatchRecordPage() {
           batch_started: formData.batch_started,
           batch_finished: formData.batch_finished || null,
           scale_id: formData.scale_id,
-          scale_target_weight: parseFloat(formData.scale_target_weight),
-          scale_actual_reading: parseFloat(formData.scale_actual_reading)
+          scale_target_weight: parseFloat(formData.scale_target_weight) || 0,
+          scale_actual_reading: parseFloat(formData.scale_actual_reading) || 0,
+          created_at: new Date().toISOString() // Explicitly set created_at
         })
         .select('id')
       
-      if (batchError) throw batchError
+      if (batchError) {
+        console.error("Error saving batch record:", batchError);
+        throw batchError;
+      }
+
+      console.log("Batch created successfully:", batchData);
 
       const batchId = batchData?.[0]?.id
       if (batchId) {
+        console.log("Processing ingredients for batch ID:", batchId);
         const validIngredients = formData.ingredients
           .filter(ing => ing.raw_material_id && ing.quantity)
         
@@ -373,15 +387,19 @@ export default function BatchRecordPage() {
           raw_material_id: ing.raw_material_id,
           batch_number: ing.batch_number || null,
           best_before_date: ing.best_before_date || null,
-          quantity: parseFloat(ing.quantity)
+          quantity: parseFloat(ing.quantity) || 0
         }))
 
         if (batchIngredients.length > 0) {
+          console.log("Saving batch ingredients:", batchIngredients);
           const { error: ingredientsError } = await supabase
             .from('batch_ingredients')
             .insert(batchIngredients)
           
-          if (ingredientsError) throw ingredientsError
+          if (ingredientsError) {
+            console.error("Error saving batch ingredients:", ingredientsError);
+            throw ingredientsError;
+          }
         }
         
         return batchId
@@ -407,6 +425,8 @@ export default function BatchRecordPage() {
     setError(null)
     
     try {
+      console.log("Updating batch with checklist for ID:", batchId);
+      
       const { error: updateError } = await supabase
         .from('batch_manufacturing_records')
         .update({
@@ -440,8 +460,12 @@ export default function BatchRecordPage() {
         })
         .eq('id', batchId)
       
-      if (updateError) throw updateError
+      if (updateError) {
+        console.error("Error updating batch with checklist:", updateError);
+        throw updateError;
+      }
       
+      console.log("Checklist saved successfully for batch ID:", batchId);
       setSuccess(true)
       
       // Wait a moment to show success message before redirecting
