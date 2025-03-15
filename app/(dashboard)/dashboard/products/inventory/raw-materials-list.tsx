@@ -447,7 +447,8 @@ export default function RawMaterialsList({ dateRange }: RawMaterialsListProps) {
                   </div>
                 ))}
               </div>
-            </div)}
+            </div>
+          )}
         </div>
       </div>
 
