@@ -1,12 +1,12 @@
 'use client'
 
-import InventoryPage from './inventory-content'
+import InventoryDashboard from './inventory-dashboard'
 import InventoryDashboardTabs from '@/components/inventory/inventory-dashboard-tabs'
 
 export default function InventoryPageWrapper() {
   return (
     <InventoryDashboardTabs>
-      <InventoryPage />
+      <InventoryDashboard />
     </InventoryDashboardTabs>
   )
 }
