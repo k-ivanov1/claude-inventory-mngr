@@ -450,7 +450,8 @@ export default function InventoryPage() {
       const term = searchTerm.toLowerCase()
       result = result.filter(item =>
         item.product_name.toLowerCase().includes(term) ||
-        item.sku.toLowerCase().includes(term)
+        item.sku.toLowerCase().includes(term) ||
+        (item.supplier && item.supplier.toLowerCase().includes(term))
       )
     }
     
