@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, RefreshCw } from 'lucide-react'
 import { FinalProduct } from './page'
+import { updateRecipeCosts } from '@/lib/utils/raw-material-utils'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface FinalProductFormProps {
   product?: FinalProduct | null
@@ -10,6 +12,7 @@ interface FinalProductFormProps {
   categories: string[]
   onClose: () => void
   onSubmit: (product: FinalProduct) => void
+  onRecipesUpdated: () => void
 }
 
 export function FinalProductForm({ 
@@ -17,11 +20,12 @@ export function FinalProductForm({
   recipes, 
   categories, 
   onClose, 
-  onSubmit 
+  onSubmit,
+  onRecipesUpdated
 }: FinalProductFormProps) {
   const [formData, setFormData] = useState<FinalProduct>({
     name: product?.name || '',
-    sku: product?.sku || '', // Added SKU field
+    sku: product?.sku || '',
     recipe_id: product?.recipe_id || '',
     recipe_name: product?.recipe_name || '',
     category: product?.category || (categories[0] || ''),
@@ -39,6 +43,9 @@ export function FinalProductForm({
     profitMargin: 0,
     profitPerItem: 0
   })
+  const [isUpdatingRecipe, setIsUpdatingRecipe] = useState(false)
+  
+  const supabase = createClientComponentClient()
 
   // Function to generate SKU
   const generateSKU = () => {
@@ -65,7 +72,7 @@ export function FinalProductForm({
       ? ((sellingPrice - recipeCost) / recipeCost) * 100 
       : 0
     const profitPerItem = sellingPrice - recipeCost
-    const profitMargin = recipeCost > 0 
+    const profitMargin = sellingPrice > 0 
       ? ((sellingPrice - recipeCost) / sellingPrice) * 100 
       : 0
 
@@ -119,6 +126,27 @@ export function FinalProductForm({
     }
   }
 
+  const handleUpdateRecipe = async () => {
+    if (!formData.recipe_id) {
+      setError('Please select a recipe first')
+      return
+    }
+
+    setIsUpdatingRecipe(true)
+    try {
+      await updateRecipeCosts(formData.recipe_id)
+      
+      // Refresh the recipes with updated costs
+      onRecipesUpdated()
+      
+      setError(null)
+    } catch (err: any) {
+      setError(err.message || 'Failed to update recipe costs')
+    } finally {
+      setIsUpdatingRecipe(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
@@ -153,8 +181,7 @@ export function FinalProductForm({
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Product Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Product Name
               </label>
               <input
@@ -190,11 +217,22 @@ export function FinalProductForm({
               />
             </div>
 
-            {/* Recipe Selection */}
+            {/* Recipe Selection with Update Button */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Recipe
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Recipe
+                </label>
+                <button 
+                  type="button" 
+                  onClick={handleUpdateRecipe}
+                  disabled={isUpdatingRecipe || !formData.recipe_id}
+                  className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1 disabled:text-gray-400"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  {isUpdatingRecipe ? 'Updating...' : 'Update Cost'}
+                </button>
+              </div>
               <select
                 name="recipe_id"
                 value={formData.recipe_id}
