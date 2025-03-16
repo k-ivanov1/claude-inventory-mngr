@@ -40,7 +40,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
   const [formData, setFormData] = useState<TeaCoffeeStock & { selectedRawMaterialId: string, selectedSupplierId: string }>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
-    type: 'raw_material', // Changed default from 'tea' to 'raw_material'
+    type: 'raw_material' as 'tea' | 'coffee' | 'raw_material' | 'final_product', // Changed default from 'tea' to 'raw_material'
     supplier: '',
     invoice_number: '',
     batch_number: '',
