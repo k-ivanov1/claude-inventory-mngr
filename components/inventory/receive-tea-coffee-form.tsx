@@ -28,6 +28,10 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
   const [success, setSuccess] = useState<string | null>(null)
   const [userOrganizationId, setUserOrganizationId] = useState<string | null>(null)
 
+  // Valid item types based on database constraint
+  const [validItemTypes] = useState<string[]>(['raw_material', 'final_product']);
+  const [selectedItemType, setSelectedItemType] = useState('raw_material');
+
   // State for approved suppliers
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
 
@@ -36,7 +40,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
   const [formData, setFormData] = useState<TeaCoffeeStock & { selectedRawMaterialId: string, selectedSupplierId: string }>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
-    type: 'tea', // Hardcoded value; this is required in the DB
+    type: 'raw_material', // Changed default from 'tea' to 'raw_material'
     supplier: '',
     invoice_number: '',
     batch_number: '',
@@ -85,8 +89,13 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
           selectedSupplierId: matchingSupplier.id
         }))
       }
+      
+      // Set the item type (if it exists and is valid)
+      if (editItem.type && validItemTypes.includes(editItem.type)) {
+        setSelectedItemType(editItem.type);
+      }
     }
-  }, [editItem, rawMaterials, suppliers])
+  }, [editItem, rawMaterials, suppliers, validItemTypes])
 
   const getUserOrganization = async () => {
     try {
@@ -193,6 +202,9 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
         selectedSupplierId: value,
         supplier: selectedSupplier ? selectedSupplier.name : ''
       })
+    } else if (name === 'itemType') {
+      // Handle item type selection
+      setSelectedItemType(value);
     } else if (type === 'checkbox') {
       const checkboxInput = e.target as HTMLInputElement
       setFormData({ ...formData, [name]: checkboxInput.checked })
@@ -233,10 +245,10 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
       const formattedDate = formData.date ? new Date(formData.date).toISOString().split('T')[0] : null
       const formattedBestBefore = formData.best_before_date ? new Date(formData.best_before_date).toISOString().split('T')[0] : null
       
-      // Prepare data for stock_receiving table - omitting organization_id initially
+      // Prepare data for stock_receiving table - using selectedItemType and omitting organization_id initially
       const stockData = {
         date: formattedDate,
-        item_type: formData.type || 'tea',
+        item_type: selectedItemType, // Use the selected valid item type
         item_id: formData.selectedRawMaterialId,
         supplier_id: formData.selectedSupplierId,
         batch_number: formData.batch_number || null,
@@ -257,7 +269,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
       const teaCoffeeData = {
         date: formattedDate,
         product_name: formData.product_name,
-        type: formData.type || 'tea',
+        type: selectedItemType, // Use the selected valid item type here too
         supplier: formData.supplier,
         invoice_number: formData.invoice_number,
         batch_number: formData.batch_number || null,
@@ -406,7 +418,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
       // Determine the unit to use - prioritize raw material unit, fallback to kg
       const unit = rawMaterialData?.unit || 'kg'
       // Determine the category - prioritize raw material category, fallback to type
-      const category = rawMaterialData?.category || stockItem.type
+      const category = rawMaterialData?.category || selectedItemType
       
       if (existingInventory) {
         // Update existing inventory record
@@ -448,7 +460,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
             unit_price: stockItem.price_per_unit,
             reorder_point: 5, // Default value
             is_recipe_based: false,
-            is_final_product: false,
+            is_final_product: selectedItemType === 'final_product', // Set based on item type
             last_updated: new Date().toISOString()
           })
           .select()
@@ -526,7 +538,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
         )}
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-            {editItem ? 'Edit Tea/Coffee Stock' : 'Receive Tea/Coffee Stock'}
+            {editItem ? 'Edit Stock' : 'Receive Stock'}
           </h3>
           <button 
             onClick={onClose}
@@ -552,7 +564,29 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
                 required
               />
             </div>
-            {/* (Type field removed from UI; value remains in formData and will default to "tea") */}
+            
+            {/* Item Type Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Item Type *
+              </label>
+              <select
+                name="itemType"
+                value={selectedItemType}
+                onChange={(e) => setSelectedItemType(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                required
+              >
+                {validItemTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Specify whether this is a raw material or final product
+              </p>
+            </div>
 
             {/* Raw Material Selection Field */}
             <div>
@@ -569,7 +603,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
                     </div>
                     <input
                       type="text"
-                      placeholder="Search raw materials..."
+                      placeholder="Search products..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="block w-full rounded-md border border-gray-300 dark:border-gray-600 pl-10 pr-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
