@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { X } from 'lucide-react'
+import { X, AlertTriangle } from 'lucide-react'
 
 // Inventory item interface
 interface InventoryItem {
@@ -39,6 +39,8 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [userOrganizationId, setUserOrganizationId] = useState<string | null>(null)
   
   const [formData, setFormData] = useState<Wastage>({
     date: new Date().toISOString().split('T')[0],
@@ -53,6 +55,7 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
 
   useEffect(() => {
     fetchInventoryItems()
+    getUserOrganization()
     
     if (item) {
       setFormData({
@@ -63,6 +66,19 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
     }
   }, [item])
 
+  const getUserOrganization = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // This is a simple implementation - in a real app, you'd fetch the user's organization from a user_profiles table
+        // For now, we'll use the user's ID as a proxy for organization
+        setUserOrganizationId(user.id)
+      }
+    } catch (error) {
+      console.error('Error getting user organization:', error)
+    }
+  }
+
   const fetchInventoryItems = async () => {
     try {
       const { data, error } = await supabase
@@ -72,7 +88,9 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
       
       if (error) throw error
       
-      setInventoryItems(data || [])
+      // Filter out items with 0 stock_level for display but keep them in the list
+      const filteredItems = data || []
+      setInventoryItems(filteredItems)
     } catch (error: any) {
       console.error('Error fetching inventory items:', error)
       setError('Failed to load inventory items. Please try again.')
@@ -123,10 +141,12 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
       return false
     }
     
-    // Check if we have enough stock
+    // Check if we have enough stock - allow recording wastage even if stock level is 0 or less than requested
     if (selectedItem && formData.quantity > selectedItem.stock_level) {
-      setError(`Not enough stock available. Current stock: ${selectedItem.stock_level} ${selectedItem.unit}`)
-      return false
+      // Just warn, but allow to continue
+      if (!window.confirm(`Warning: The wastage quantity (${formData.quantity}) is greater than the current stock level (${selectedItem.stock_level}). Do you want to continue?`)) {
+        return false
+      }
     }
     
     return true
@@ -149,24 +169,51 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
         quantity: formData.quantity,
         reason: formData.reason,
         recorded_by: formData.recorded_by,
-        notes: formData.notes || null
+        notes: formData.notes || null,
+        organization_id: userOrganizationId
       }
       
-      const { error: wastageError } = await supabase
+      const { data: newWastage, error: wastageError } = await supabase
         .from('wastage')
         .insert(wastageData)
+        .select()
       
       if (wastageError) throw wastageError
       
       // 2. Update inventory stock level (reduce by wastage quantity)
-      const { error: inventoryError } = await supabase
+      // First, get the current inventory item to know its current stock level
+      const { data: inventoryData, error: inventoryGetError } = await supabase
+        .from('inventory')
+        .select('stock_level')
+        .eq('id', formData.product_id)
+        .single()
+      
+      if (inventoryGetError) throw inventoryGetError
+      
+      // Calculate new stock level, ensuring it doesn't go below 0
+      const currentStock = inventoryData?.stock_level || 0
+      const newStockLevel = Math.max(0, currentStock - formData.quantity)
+      
+      // Update the inventory with the new stock level
+      const { error: inventoryUpdateError } = await supabase
         .from('inventory')
         .update({
-          stock_level: selectedItem!.stock_level - formData.quantity
+          stock_level: newStockLevel,
+          last_updated: new Date().toISOString()
         })
         .eq('id', formData.product_id)
       
-      if (inventoryError) throw inventoryError
+      if (inventoryUpdateError) throw inventoryUpdateError
+      
+      // 3. Add inventory movement record for this wastage
+      await createInventoryMovement(
+        formData.product_id,
+        selectedItem?.product_name || 'Unknown Product',
+        'wastage',
+        -formData.quantity, // Negative quantity since it's a reduction
+        newWastage ? newWastage[0]?.id : '',
+        formData.recorded_by
+      )
       
       // Success
       onSuccess()
@@ -177,6 +224,40 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
       setLoading(false)
     }
   }
+  
+  // Function to create inventory movement record
+  const createInventoryMovement = async (
+    inventoryId: string, 
+    productName: string, 
+    movementType: string, 
+    quantity: number, 
+    referenceId: string,
+    createdBy: string
+  ) => {
+    try {
+      await supabase
+        .from('inventory_movements')
+        .insert({
+          inventory_id: inventoryId,
+          movement_type: movementType,
+          quantity: quantity,
+          reference_id: referenceId,
+          reference_type: 'wastage',
+          notes: `Wastage recorded for ${productName}: ${formData.reason}`,
+          created_by: createdBy,
+          organization_id: userOrganizationId
+        })
+    } catch (error) {
+      console.error('Error creating inventory movement:', error)
+      // We'll just log this error but not throw, as it's not critical to the main operation
+    }
+  }
+  
+  // Filter inventory items based on search term
+  const filteredInventoryItems = inventoryItems.filter(item => 
+    item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.category.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
@@ -224,20 +305,37 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Product
             </label>
-            <select
-              name="product_id"
-              value={formData.product_id}
-              onChange={handleChange}
-              className="mt-1 block w-full rounded-md border dark:border-gray-600 border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-              required
-            >
-              <option value="">Select a product</option>
-              {inventoryItems.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.product_name} - {item.stock_level} {item.unit} available
-                </option>
-              ))}
-            </select>
+            <div className="relative mt-1">
+              <div className="mb-2">
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="block w-full rounded-md border dark:border-gray-600 border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <select
+                name="product_id"
+                value={formData.product_id}
+                onChange={handleChange}
+                className="block w-full rounded-md border dark:border-gray-600 border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                required
+              >
+                <option value="">Select a product</option>
+                {filteredInventoryItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.product_name} - {item.stock_level} {item.unit} available
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedItem && selectedItem.stock_level === 0 && (
+              <div className="mt-1 text-amber-600 dark:text-amber-400 text-sm flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-1" />
+                Warning: This item has 0 stock. Recording wastage will result in negative stock.
+              </div>
+            )}
           </div>
 
           <div>
@@ -250,8 +348,8 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleChange}
-                min="1"
-                step="1"
+                min="0.01"
+                step="0.01"
                 className="block w-full flex-1 rounded-l-md border dark:border-gray-600 border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               />
@@ -278,6 +376,8 @@ export function WastageForm({ item, onClose, onSuccess }: WastageFormProps) {
               <option value="Quality issue">Quality issue</option>
               <option value="Spillage">Spillage</option>
               <option value="Production loss">Production loss</option>
+              <option value="Theft">Theft or Loss</option>
+              <option value="Spoilage">Spoilage</option>
               <option value="Other">Other</option>
             </select>
           </div>
