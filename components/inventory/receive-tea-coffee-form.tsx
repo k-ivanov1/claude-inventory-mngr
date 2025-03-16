@@ -33,7 +33,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
 
   // Form data with type hardcoded; batch_number, best_before_date and package_size are optional.
   // Note: package_size is now in KG.
-  const [formData, setFormData] = useState<TeaCoffeeStock>({
+  const [formData, setFormData] = useState<TeaCoffeeStock & { selectedRawMaterialId: string, selectedSupplierId: string }>({
     date: new Date().toISOString().split('T')[0],
     product_name: '',
     type: 'tea', // Hardcoded value; this is required in the DB
@@ -47,7 +47,9 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     is_damaged: false,
     is_accepted: true,
     checked_by: '',
-    labelling_matches_specifications: true
+    labelling_matches_specifications: true,
+    selectedRawMaterialId: '', // Added for UUID reference
+    selectedSupplierId: '' // Added for UUID reference
   })
 
   const supabase = createClientComponentClient()
@@ -61,10 +63,30 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     if (editItem) {
       setFormData({
         ...editItem,
-        labelling_matches_specifications: editItem.labelling_matches_specifications ?? true
+        labelling_matches_specifications: editItem.labelling_matches_specifications ?? true,
+        selectedRawMaterialId: '', // Will be set separately
+        selectedSupplierId: '' // Will be set separately
       })
+
+      // Try to find the raw material ID for this product name
+      const matchingMaterial = rawMaterials.find(m => m.name === editItem.product_name)
+      if (matchingMaterial) {
+        setFormData(prev => ({
+          ...prev,
+          selectedRawMaterialId: matchingMaterial.id
+        }))
+      }
+
+      // Try to find the supplier ID for this supplier name
+      const matchingSupplier = suppliers.find(s => s.name === editItem.supplier)
+      if (matchingSupplier) {
+        setFormData(prev => ({
+          ...prev,
+          selectedSupplierId: matchingSupplier.id
+        }))
+      }
     }
-  }, [editItem])
+  }, [editItem, rawMaterials, suppliers])
 
   const getUserOrganization = async () => {
     try {
@@ -132,7 +154,24 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target
-    if (type === 'checkbox') {
+    
+    if (name === 'selectedRawMaterialId') {
+      // When raw material changes, update both the ID and the product name
+      const selectedMaterial = rawMaterials.find(m => m.id === value)
+      setFormData({ 
+        ...formData, 
+        selectedRawMaterialId: value,
+        product_name: selectedMaterial ? selectedMaterial.name : ''
+      })
+    } else if (name === 'selectedSupplierId') {
+      // When supplier changes, update both the ID and the supplier name
+      const selectedSupplier = suppliers.find(s => s.id === value)
+      setFormData({ 
+        ...formData, 
+        selectedSupplierId: value,
+        supplier: selectedSupplier ? selectedSupplier.name : ''
+      })
+    } else if (type === 'checkbox') {
       const checkboxInput = e.target as HTMLInputElement
       setFormData({ ...formData, [name]: checkboxInput.checked })
     } else if (type === 'number') {
@@ -163,75 +202,111 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     
     try {
       // Basic validations
-      if (!formData.product_name) throw new Error('Please select a product.')
-      if (!formData.supplier) throw new Error('Please select a supplier.')
+      if (!formData.selectedRawMaterialId) throw new Error('Please select a product.')
+      if (!formData.selectedSupplierId) throw new Error('Please select a supplier.')
       if (!formData.invoice_number) throw new Error('Invoice number is required.')
       if (formData.quantity <= 0) throw new Error('Quantity must be greater than zero.')
       
-      // Ensure type is set; if empty, default to "tea"
-      const updatedFormData = { 
-        ...formData, 
-        type: formData.type || 'tea',
+      // Format date for Supabase
+      const formattedDate = formData.date ? new Date(formData.date).toISOString().split('T')[0] : null
+      const formattedBestBefore = formData.best_before_date ? new Date(formData.best_before_date).toISOString().split('T')[0] : null
+      
+      // Prepare data for stock_receiving table
+      const stockData = {
+        date: formattedDate,
+        item_type: formData.type || 'tea',
+        item_id: formData.selectedRawMaterialId, // Use the UUID
+        supplier_id: formData.selectedSupplierId, // Use the UUID
+        batch_number: formData.batch_number || null,
+        quantity: formData.quantity,
+        unit_price: formData.price_per_unit,
+        total_cost: totalCost,
+        invoice_number: formData.invoice_number,
+        best_before_date: formattedBestBefore,
+        is_accepted: formData.is_accepted,
+        notes: formData.labelling_matches_specifications ? "Labelling matches specifications" : "Labelling issues noted",
+        checked_by: formData.checked_by,
         organization_id: userOrganizationId
       }
       
-      // Convert empty optional fields to null to avoid DB errors (especially for dates)
-      const dataToSubmit = {
-        date: updatedFormData.date,
-        product_name: updatedFormData.product_name,
-        type: updatedFormData.type,
-        supplier: updatedFormData.supplier,
-        invoice_number: updatedFormData.invoice_number,
-        batch_number: updatedFormData.batch_number ? updatedFormData.batch_number : null,
-        best_before_date: updatedFormData.best_before_date ? updatedFormData.best_before_date : null,
-        quantity: updatedFormData.quantity,
-        price_per_unit: updatedFormData.price_per_unit,
-        package_size: updatedFormData.package_size ? updatedFormData.package_size : null,
-        is_damaged: updatedFormData.is_damaged,
-        is_accepted: updatedFormData.is_accepted,
-        checked_by: updatedFormData.checked_by,
+      // For backward compatibility, also update the stock_tea_coffee table if it exists
+      const teaCoffeeData = {
+        date: formattedDate,
+        product_name: formData.product_name,
+        type: formData.type || 'tea',
+        supplier: formData.supplier,
+        invoice_number: formData.invoice_number,
+        batch_number: formData.batch_number || null,
+        best_before_date: formattedBestBefore,
+        quantity: formData.quantity,
+        price_per_unit: formData.price_per_unit,
+        package_size: formData.package_size || null,
+        is_damaged: formData.is_damaged,
+        is_accepted: formData.is_accepted,
+        checked_by: formData.checked_by,
         total_kg: totalKg,
         price_per_kg: pricePerKg,
         total_cost: totalCost,
         organization_id: userOrganizationId
       }
       
-      let result
+      let stockReceivingResult;
+      let stockTeaCoffeeResult;
+      
       if (editItem?.id) {
         // Get the old quantity before updating
         const { data: oldStockData } = await supabase
-          .from('stock_tea_coffee')
+          .from('stock_receiving')
           .select('quantity')
           .eq('id', editItem.id)
           .single()
         
-        // Update the stock record
-        result = await supabase
-          .from('stock_tea_coffee')
-          .update(dataToSubmit)
+        // Update the stock records
+        stockReceivingResult = await supabase
+          .from('stock_receiving')
+          .update(stockData)
           .eq('id', editItem.id)
         
-        if (result.error) throw result.error
+        // Also try to update tea/coffee table for backward compatibility
+        try {
+          stockTeaCoffeeResult = await supabase
+            .from('stock_tea_coffee')
+            .update(teaCoffeeData)
+            .eq('id', editItem.id)
+        } catch (error) {
+          console.error('Error updating stock_tea_coffee (may be expected if table doesn\'t exist):', error)
+        }
+        
+        if (stockReceivingResult.error) throw stockReceivingResult.error
         
         // Calculate the difference in quantity for inventory adjustment
         const oldQuantity = oldStockData?.quantity || 0
-        const quantityDifference = updatedFormData.quantity - oldQuantity
+        const quantityDifference = formData.quantity - oldQuantity
         
         // Only update inventory if the difference isn't zero and the item is accepted
-        if (quantityDifference !== 0 && updatedFormData.is_accepted) {
-          await updateInventory(updatedFormData, quantityDifference)
+        if (quantityDifference !== 0 && formData.is_accepted) {
+          await updateInventory(formData, quantityDifference)
         }
       } else {
         // Insert new stock record
-        result = await supabase
-          .from('stock_tea_coffee')
-          .insert(dataToSubmit)
+        stockReceivingResult = await supabase
+          .from('stock_receiving')
+          .insert(stockData)
         
-        if (result.error) throw result.error
+        // Also try to insert into tea/coffee table for backward compatibility
+        try {
+          stockTeaCoffeeResult = await supabase
+            .from('stock_tea_coffee')
+            .insert(teaCoffeeData)
+        } catch (error) {
+          console.error('Error inserting stock_tea_coffee (may be expected if table doesn\'t exist):', error)
+        }
+        
+        if (stockReceivingResult.error) throw stockReceivingResult.error
         
         // Only update inventory if the item is accepted
-        if (updatedFormData.is_accepted) {
-          await updateInventory(updatedFormData)
+        if (formData.is_accepted) {
+          await updateInventory(formData)
         }
       }
       
@@ -248,7 +323,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     }
   }
 
-  const updateInventory = async (stockItem: TeaCoffeeStock, quantityDifference?: number) => {
+  const updateInventory = async (stockItem: TeaCoffeeStock & { selectedRawMaterialId: string }, quantityDifference?: number) => {
     try {
       const quantityToAdd = quantityDifference !== undefined ? quantityDifference : stockItem.quantity;
       
@@ -268,7 +343,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
       const { data: rawMaterialData, error: rawMaterialError } = await supabase
         .from('raw_materials')
         .select('unit, category')
-        .eq('name', stockItem.product_name)
+        .eq('id', stockItem.selectedRawMaterialId)
         .maybeSingle()
       
       if (rawMaterialError) throw rawMaterialError
@@ -449,15 +524,15 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
                     />
                   </div>
                   <select
-                    name="product_name"
-                    value={formData.product_name}
+                    name="selectedRawMaterialId"
+                    value={formData.selectedRawMaterialId}
                     onChange={handleChange}
                     className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                     required
                   >
                     <option value="">Select a product</option>
                     {filteredRawMaterials.map((material) => (
-                      <option key={material.id} value={material.name}>
+                      <option key={material.id} value={material.id}>
                         {material.name} ({material.category})
                       </option>
                     ))}
@@ -477,15 +552,15 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
                 Supplier *
               </label>
               <select
-                name="supplier"
-                value={formData.supplier}
+                name="selectedSupplierId"
+                value={formData.selectedSupplierId}
                 onChange={handleChange}
                 className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
               >
                 <option value="">Select a supplier</option>
                 {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.name}>
+                  <option key={supplier.id} value={supplier.id}>
                     {supplier.name}
                   </option>
                 ))}
@@ -602,6 +677,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
             </div>
           </div>
 
+          {/* Rest of the form remains unchanged... */}
           {/* Calculated Fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
             <div>
