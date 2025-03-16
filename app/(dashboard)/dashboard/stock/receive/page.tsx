@@ -29,7 +29,7 @@ interface StockReceivingRecord {
 export default function ReceiveStockPage() {
   const [showForm, setShowForm] = useState(false)
   const [stockRecords, setStockRecords] = useState<StockReceivingRecord[]>([])
-  const [editingStock, setEditingStock] = useState<StockReceivingRecord | undefined>()
+  const [editingStock, setEditingStock] = useState<any>()
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showDebugView, setShowDebugView] = useState(false)
@@ -44,11 +44,10 @@ export default function ReceiveStockPage() {
     setLoading(true)
     try {
       // Try to fetch from the function first
-      const { data: functionData, error: functionError } = await supabase
-        .rpc('get_stock_records')
+      const { data: functionData, error: functionError } = await supabase.rpc('get_stock_records')
       
       if (!functionError && functionData) {
-        console.log('Loaded stock records from function:', functionData);
+        console.log('Loaded stock records from function:', functionData)
         setStockRecords(functionData)
         setLoading(false)
         return
@@ -62,14 +61,14 @@ export default function ReceiveStockPage() {
         .limit(50)
       
       if (!viewError && viewData) {
-        console.log('Loaded stock records from view:', viewData);
+        console.log('Loaded stock records from view:', viewData)
         setStockRecords(viewData)
         setLoading(false)
         return
       }
       
       // If view doesn't exist, fetch directly and join manually
-      console.log('Falling back to direct query with joins');
+      console.log('Falling back to direct query with joins')
       const { data: stockData, error: stockError } = await supabase
         .from('stock_receiving')
         .select('*')
@@ -81,21 +80,21 @@ export default function ReceiveStockPage() {
       // Enhance the data with product and supplier information
       const enhancedData = await Promise.all((stockData || []).map(async (record) => {
         // Try to get product name based on item_type
-        let productName = 'Unknown Product';
+        let productName = 'Unknown Product'
         if (record.item_type === 'raw_material') {
           const { data: productData } = await supabase
             .from('raw_materials')
             .select('name')
             .eq('id', record.item_id)
-            .single();
-          if (productData) productName = productData.name;
+            .single()
+          if (productData) productName = productData.name
         } else if (record.item_type === 'final_product') {
           const { data: productData } = await supabase
             .from('final_products')
             .select('name')
             .eq('id', record.item_id)
-            .single();
-          if (productData) productName = productData.name;
+            .single()
+          if (productData) productName = productData.name
         }
         
         // Get supplier name
@@ -103,17 +102,17 @@ export default function ReceiveStockPage() {
           .from('suppliers')
           .select('name')
           .eq('id', record.supplier_id)
-          .single();
+          .single()
         
         return {
           ...record,
           product_name: productName,
           supplier_name: supplierData?.name || 'Unknown Supplier'
-        };
-      }));
+        }
+      }))
       
-      console.log('Enhanced stock data:', enhancedData);
-      setStockRecords(enhancedData);
+      console.log('Enhanced stock data:', enhancedData)
+      setStockRecords(enhancedData)
     } catch (error) {
       console.error('Error loading stock data:', error)
       alert('Failed to load stock data. Please try again.')
@@ -139,10 +138,27 @@ export default function ReceiveStockPage() {
   }
 
   const handleEdit = (item: StockReceivingRecord) => {
-    // Convert to TeaCoffeeStock compatible format
-    setEditingStock({
-      ...item
-    })
+    // Map the fetched record to a TeaCoffeeStock-compatible object.
+    const teaCoffeeItem = {
+      id: item.id,
+      date: item.date,
+      product_name: item.product_name || '',
+      supplier: item.supplier_name || '',
+      invoice_number: item.invoice_number,
+      quantity: item.quantity,
+      price_per_unit: item.unit_price,
+      is_damaged: false, // default value
+      is_accepted: item.is_accepted,
+      checked_by: item.checked_by,
+      created_at: item.created_at,
+      // Cast item_type to include all allowed values.
+      type: item.item_type as 'tea' | 'coffee' | 'raw_material' | 'final_product',
+      batch_number: item.batch_number || '',
+      best_before_date: item.best_before_date || '',
+      package_size: 0, // default value; adjust if needed
+      labelling_matches_specifications: true // default value; adjust if needed
+    }
+    setEditingStock(teaCoffeeItem)
     setShowForm(true)
   }
 
