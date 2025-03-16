@@ -3,15 +3,36 @@
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { ReceiveTeaCoffeeForm } from '@/components/inventory/receive-tea-coffee-form'
-import { TeaCoffeeStock } from '@/lib/types/stock'
+import { StockVerificationComponent } from '@/components/inventory/stock-verification'
 import { Search } from 'lucide-react'
+
+interface StockReceivingRecord {
+  id: string
+  date: string
+  item_type: string
+  item_id: string
+  supplier_id: string
+  product_name?: string
+  supplier_name?: string
+  batch_number?: string
+  quantity: number
+  unit_price: number
+  total_cost: number
+  invoice_number: string
+  best_before_date?: string
+  is_accepted: boolean
+  notes?: string
+  checked_by: string
+  created_at: string
+}
 
 export default function ReceiveStockPage() {
   const [showForm, setShowForm] = useState(false)
-  const [stocks, setStocks] = useState<TeaCoffeeStock[]>([])
-  const [editingStock, setEditingStock] = useState<TeaCoffeeStock | undefined>()
+  const [stockRecords, setStockRecords] = useState<StockReceivingRecord[]>([])
+  const [editingStock, setEditingStock] = useState<StockReceivingRecord | undefined>()
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [showDebugView, setShowDebugView] = useState(false)
 
   const supabase = createClientComponentClient()
 
@@ -22,13 +43,77 @@ export default function ReceiveStockPage() {
   const loadStockData = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('stock_tea_coffee')
+      // Try to fetch from the function first
+      const { data: functionData, error: functionError } = await supabase
+        .rpc('get_stock_records')
+      
+      if (!functionError && functionData) {
+        console.log('Loaded stock records from function:', functionData);
+        setStockRecords(functionData)
+        setLoading(false)
+        return
+      }
+      
+      // If function doesn't exist, try the view
+      const { data: viewData, error: viewError } = await supabase
+        .from('stock_receiving_view')
         .select('*')
         .order('date', { ascending: false })
         .limit(50)
-      if (error) throw error
-      setStocks(data || [])
+      
+      if (!viewError && viewData) {
+        console.log('Loaded stock records from view:', viewData);
+        setStockRecords(viewData)
+        setLoading(false)
+        return
+      }
+      
+      // If view doesn't exist, fetch directly and join manually
+      console.log('Falling back to direct query with joins');
+      const { data: stockData, error: stockError } = await supabase
+        .from('stock_receiving')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(50)
+      
+      if (stockError) throw stockError
+      
+      // Enhance the data with product and supplier information
+      const enhancedData = await Promise.all((stockData || []).map(async (record) => {
+        // Try to get product name based on item_type
+        let productName = 'Unknown Product';
+        if (record.item_type === 'raw_material') {
+          const { data: productData } = await supabase
+            .from('raw_materials')
+            .select('name')
+            .eq('id', record.item_id)
+            .single();
+          if (productData) productName = productData.name;
+        } else if (record.item_type === 'final_product') {
+          const { data: productData } = await supabase
+            .from('final_products')
+            .select('name')
+            .eq('id', record.item_id)
+            .single();
+          if (productData) productName = productData.name;
+        }
+        
+        // Get supplier name
+        const { data: supplierData } = await supabase
+          .from('suppliers')
+          .select('name')
+          .eq('id', record.supplier_id)
+          .single();
+        
+        return {
+          ...record,
+          product_name: productName,
+          supplier_name: supplierData?.name || 'Unknown Supplier'
+        };
+      }));
+      
+      console.log('Enhanced stock data:', enhancedData);
+      setStockRecords(enhancedData);
     } catch (error) {
       console.error('Error loading stock data:', error)
       alert('Failed to load stock data. Please try again.')
@@ -41,7 +126,7 @@ export default function ReceiveStockPage() {
     if (confirm('Are you sure you want to delete this item?')) {
       try {
         const { error } = await supabase
-          .from('stock_tea_coffee')
+          .from('stock_receiving')
           .delete()
           .eq('id', id)
         if (error) throw error
@@ -53,8 +138,11 @@ export default function ReceiveStockPage() {
     }
   }
 
-  const handleEdit = (item: TeaCoffeeStock) => {
-    setEditingStock(item)
+  const handleEdit = (item: StockReceivingRecord) => {
+    // Convert to TeaCoffeeStock compatible format
+    setEditingStock({
+      ...item
+    })
     setShowForm(true)
   }
 
@@ -68,35 +156,44 @@ export default function ReceiveStockPage() {
     }).format(date)
   }
 
-  const filterStocks = (stocks: TeaCoffeeStock[]) => {
+  const filterStocks = (stocks: StockReceivingRecord[]) => {
     const term = searchTerm.toLowerCase()
     return stocks.filter(item => {
       return (
-        item.product_name.toLowerCase().includes(term) ||
-        item.supplier.toLowerCase().includes(term) ||
-        (item.batch_number ? item.batch_number.toLowerCase().includes(term) : false)
+        (item.product_name?.toLowerCase().includes(term) || false) ||
+        (item.supplier_name?.toLowerCase().includes(term) || false) ||
+        (item.batch_number ? item.batch_number.toLowerCase().includes(term) : false) ||
+        (item.invoice_number ? item.invoice_number.toLowerCase().includes(term) : false)
       )
     })
   }
 
-  const filteredStocks = filterStocks(stocks)
+  const filteredStocks = filterStocks(stockRecords)
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Stock Receiving</h2>
-          <p className="text-gray-600 dark:text-gray-300">Manage incoming tea/coffee stock and inventory</p>
+          <p className="text-gray-600 dark:text-gray-300">Manage incoming stock and inventory</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingStock(undefined)
-            setShowForm(true)
-          }}
-          className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-        >
-          Add Tea/Coffee Stock
-        </button>
+        <div className="flex space-x-4">
+          <button
+            onClick={() => {
+              setEditingStock(undefined)
+              setShowForm(true)
+            }}
+            className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+          >
+            Add Stock
+          </button>
+          <button
+            onClick={() => setShowDebugView(!showDebugView)}
+            className="rounded-md bg-gray-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-500"
+          >
+            {showDebugView ? 'Hide Debug View' : 'Show Debug View'}
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -113,41 +210,35 @@ export default function ReceiveStockPage() {
         />
       </div>
 
+      {showDebugView && <StockVerificationComponent />}
+
       <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                {[
-                  'Date', 
-                  'Product', 
-                  'Supplier', 
-                  'Batch', 
-                  'Best Before', 
-                  'Qty', 
-                  'Pkg Size (KG)', 
-                  'Total Kg', 
-                  'Price/Unit', 
-                  'Total Cost', 
-                  'Status', 
-                  'Actions'
-                ].map(header => (
-                  <th key={header} scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    {header}
-                  </th>
-                ))}
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Product</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Supplier</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Batch</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Qty</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Unit Price</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Cost</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     Loading...
                   </td>
                 </tr>
               ) : filteredStocks.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  <td colSpan={10} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                     No stock records found.
                   </td>
                 </tr>
@@ -156,24 +247,17 @@ export default function ReceiveStockPage() {
                   <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(item.date)}</td>
                     <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">{item.product_name}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{item.type}</div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{item.product_name || 'Unknown Product'}</div>
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.supplier}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.item_type}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.supplier_name || 'Unknown Supplier'}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.batch_number || '-'}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(item.best_before_date)}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.quantity}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {item.package_size ? item.package_size.toFixed(2) : '-'}
+                      £{item.unit_price ? item.unit_price.toFixed(2) : '0.00'}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {item.total_kg ? item.total_kg.toFixed(2) : '-'} kg
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      £{item.price_per_unit ? item.price_per_unit.toFixed(2) : '-'}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      £{item.total_cost ? item.total_cost.toFixed(2) : '-'}
+                      £{item.total_cost ? item.total_cost.toFixed(2) : '0.00'}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
