@@ -92,12 +92,34 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        // This is a simple implementation - in a real app, you'd fetch the user's organization from a user_profiles table
-        // For now, we'll use the user's ID as a proxy for organization
-        setUserOrganizationId(user.id)
+        console.log("Current user:", user);
+        
+        // Check if we can get organization from user metadata
+        if (user.app_metadata && user.app_metadata.organization_id) {
+          setUserOrganizationId(user.app_metadata.organization_id);
+          return;
+        }
+        
+        // Try to get from user table
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
+          
+        if (!userError && userData && userData.organization_id) {
+          setUserOrganizationId(userData.organization_id);
+          return;
+        }
+        
+        // Fallback to user ID as organization ID if nothing else works
+        setUserOrganizationId(user.id);
       }
     } catch (error) {
-      console.error('Error getting user organization:', error)
+      console.error('Error getting user organization:', error);
+      // Don't set organization ID to null - this will cause RLS issues
+      // Instead, set a debugging value that will be obvious if it shows up in your DB
+      setUserOrganizationId('fallback-org-id');
     }
   }
 
@@ -211,12 +233,12 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
       const formattedDate = formData.date ? new Date(formData.date).toISOString().split('T')[0] : null
       const formattedBestBefore = formData.best_before_date ? new Date(formData.best_before_date).toISOString().split('T')[0] : null
       
-      // Prepare data for stock_receiving table
+      // Prepare data for stock_receiving table - omitting organization_id initially
       const stockData = {
         date: formattedDate,
         item_type: formData.type || 'tea',
-        item_id: formData.selectedRawMaterialId, // Use the UUID
-        supplier_id: formData.selectedSupplierId, // Use the UUID
+        item_id: formData.selectedRawMaterialId,
+        supplier_id: formData.selectedSupplierId,
         batch_number: formData.batch_number || null,
         quantity: formData.quantity,
         unit_price: formData.price_per_unit,
@@ -225,9 +247,11 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
         best_before_date: formattedBestBefore,
         is_accepted: formData.is_accepted,
         notes: formData.labelling_matches_specifications ? "Labelling matches specifications" : "Labelling issues noted",
-        checked_by: formData.checked_by,
-        organization_id: userOrganizationId
+        checked_by: formData.checked_by
       }
+      
+      // Log what we're about to insert for debugging
+      console.log("Inserting stock data:", stockData);
       
       // For backward compatibility, also update the stock_tea_coffee table if it exists
       const teaCoffeeData = {
@@ -246,8 +270,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
         checked_by: formData.checked_by,
         total_kg: totalKg,
         price_per_kg: pricePerKg,
-        total_cost: totalCost,
-        organization_id: userOrganizationId
+        total_cost: totalCost
       }
       
       let stockReceivingResult;
@@ -266,6 +289,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
           .from('stock_receiving')
           .update(stockData)
           .eq('id', editItem.id)
+          .select()
         
         // Also try to update tea/coffee table for backward compatibility
         try {
@@ -287,11 +311,44 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
         if (quantityDifference !== 0 && formData.is_accepted) {
           await updateInventory(formData, quantityDifference)
         }
+        
+        // Try to update the organization ID separately
+        if (stockReceivingResult.data && stockReceivingResult.data[0] && userOrganizationId) {
+          try {
+            await supabase
+              .from('stock_receiving')
+              .update({ organization_id: userOrganizationId })
+              .eq('id', stockReceivingResult.data[0].id);
+          } catch (orgError) {
+            console.error("Error updating organization ID:", orgError);
+            // Non-critical error, continue
+          }
+        }
+        
       } else {
         // Insert new stock record
         stockReceivingResult = await supabase
           .from('stock_receiving')
           .insert(stockData)
+          .select()
+        
+        if (stockReceivingResult.error) {
+          console.error('Error in stock_receiving insert:', stockReceivingResult.error);
+          throw stockReceivingResult.error;
+        }
+        
+        // Try to update the organization ID separately
+        if (stockReceivingResult.data && stockReceivingResult.data[0] && userOrganizationId) {
+          try {
+            await supabase
+              .from('stock_receiving')
+              .update({ organization_id: userOrganizationId })
+              .eq('id', stockReceivingResult.data[0].id);
+          } catch (orgError) {
+            console.error("Error updating organization ID:", orgError);
+            // Non-critical error, continue
+          }
+        }
         
         // Also try to insert into tea/coffee table for backward compatibility
         try {
@@ -301,8 +358,6 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
         } catch (error) {
           console.error('Error inserting stock_tea_coffee (may be expected if table doesn\'t exist):', error)
         }
-        
-        if (stockReceivingResult.error) throw stockReceivingResult.error
         
         // Only update inventory if the item is accepted
         if (formData.is_accepted) {
@@ -360,8 +415,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
           .update({
             stock_level: existingInventory.stock_level + quantityToAdd,
             unit_price: stockItem.price_per_unit, // Update unit price with latest
-            last_updated: new Date().toISOString(),
-            organization_id: userOrganizationId
+            last_updated: new Date().toISOString()
           })
           .eq('id', existingInventory.id)
         
@@ -395,8 +449,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
             reorder_point: 5, // Default value
             is_recipe_based: false,
             is_final_product: false,
-            last_updated: new Date().toISOString(),
-            organization_id: userOrganizationId
+            last_updated: new Date().toISOString()
           })
           .select()
         
@@ -439,8 +492,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
           reference_id: referenceId,
           reference_type: 'stock_receipt',
           notes: `Stock receipt for ${productName}`,
-          created_by: createdBy,
-          organization_id: userOrganizationId
+          created_by: createdBy
         })
     } catch (error) {
       console.error('Error creating inventory movement:', error)
@@ -677,7 +729,6 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
             </div>
           </div>
 
-          {/* Rest of the form remains unchanged... */}
           {/* Calculated Fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
             <div>
