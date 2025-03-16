@@ -15,7 +15,7 @@ export interface StockBaseFields {
 
 // Tea/Coffee specific fields
 export interface TeaCoffeeStock extends StockBaseFields {
-  type: 'tea' | 'coffee';
+  type: 'tea' | 'coffee' | 'raw_material' | 'final_product';
   batch_number: string;
   best_before_date: string;
   package_size: number; // in grams
