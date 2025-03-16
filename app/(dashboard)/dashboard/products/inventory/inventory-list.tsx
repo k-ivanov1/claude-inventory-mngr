@@ -33,6 +33,15 @@ interface InventoryItem {
   is_final_product?: boolean
 }
 
+// Unit conversion interface
+interface UnitConversion {
+  id: string
+  material_id: string
+  base_unit: string
+  conversion_unit: string
+  conversion_rate: number
+}
+
 interface InventoryListProps {
   dateRange: {
     start: Date
@@ -53,6 +62,9 @@ export default function InventoryList({ dateRange }: InventoryListProps) {
   const [categories, setCategories] = useState<string[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
+  const [unitConversions, setUnitConversions] = useState<Record<string, UnitConversion>>({})
+  const [showTypeFilter, setShowTypeFilter] = useState(false)
+  const [selectedItemType, setSelectedItemType] = useState<string>('all')
 
   const supabase = createClientComponentClient()
 
@@ -60,11 +72,12 @@ export default function InventoryList({ dateRange }: InventoryListProps) {
     fetchInventoryItems()
     fetchCategories()
     fetchSuppliers()
+    fetchUnitConversions()
   }, [dateRange])
 
   useEffect(() => {
     filterInventory()
-  }, [searchTerm, inventory, selectedCategories, sortField, sortDirection])
+  }, [searchTerm, inventory, selectedCategories, sortField, sortDirection, selectedItemType])
 
   const fetchInventoryItems = async () => {
     setLoading(true)
@@ -142,6 +155,29 @@ export default function InventoryList({ dateRange }: InventoryListProps) {
     }
   }
 
+  // Fetch unit conversions to display alternative units
+  const fetchUnitConversions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('material_unit_conversions')
+        .select('*')
+      
+      if (error) throw error
+      
+      // Create a lookup object by material_id
+      const conversionsMap: Record<string, UnitConversion> = {}
+      if (data) {
+        for (const conversion of data) {
+          conversionsMap[conversion.material_id] = conversion
+        }
+      }
+      
+      setUnitConversions(conversionsMap)
+    } catch (error) {
+      console.error('Error fetching unit conversions:', error)
+    }
+  }
+
   const filterInventory = (items = inventory) => {
     let result = [...items]
     
@@ -160,6 +196,17 @@ export default function InventoryList({ dateRange }: InventoryListProps) {
     // Apply category filter
     if (selectedCategories.length > 0) {
       result = result.filter(item => selectedCategories.includes(item.category))
+    }
+    
+    // Apply item type filter
+    if (selectedItemType !== 'all') {
+      if (selectedItemType === 'raw') {
+        result = result.filter(item => !item.is_recipe_based && !item.is_final_product)
+      } else if (selectedItemType === 'recipe') {
+        result = result.filter(item => item.is_recipe_based && !item.is_final_product)
+      } else if (selectedItemType === 'final') {
+        result = result.filter(item => item.is_final_product)
+      }
     }
     
     // Apply sorting
@@ -215,6 +262,31 @@ export default function InventoryList({ dateRange }: InventoryListProps) {
         setError('Failed to delete inventory item. Please try again.')
       }
     }
+  }
+
+  // Function to display alternative unit for an item if available
+  const getAltUnitDisplay = (item: InventoryItem) => {
+    // Check if we have a unit conversion for this item's material ID
+    // For now, we'll look up by product name since we don't have direct material_id in inventory
+    const conversion = Object.values(unitConversions).find(conv => {
+      // This is a simplification - in a real app, you'd have a more reliable way to match
+      return convMatchesMaterial(conv, item.product_name)
+    })
+    
+    if (conversion) {
+      // Calculate and display the alternate unit
+      const altUnitValue = item.stock_level * conversion.conversion_rate
+      return `(${altUnitValue.toFixed(2)} ${conversion.conversion_unit})`
+    }
+    
+    return null
+  }
+  
+  // Helper function to match conversion to a material - would be better with direct IDs
+  const convMatchesMaterial = (conversion: UnitConversion, productName: string) => {
+    // For now, let's just match by checking if product name includes conversion material_id
+    // This is a hack - ideally you'd have proper ID matching
+    return conversion.material_id.includes(productName) || productName.includes(conversion.material_id)
   }
 
   // Calculate inventory metrics
@@ -383,6 +455,78 @@ export default function InventoryList({ dateRange }: InventoryListProps) {
           )}
         </div>
         
+        {/* Item Type Filter */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowTypeFilter(!showTypeFilter)}
+            className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Item Type
+            <ChevronDown className="h-4 w-4 ml-2" />
+          </button>
+          
+          {showTypeFilter && (
+            <div className="absolute z-10 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
+              <div className="py-1" role="menu" aria-orientation="vertical">
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <input
+                    type="radio"
+                    id="type-all"
+                    name="item-type"
+                    checked={selectedItemType === 'all'}
+                    onChange={() => setSelectedItemType('all')}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 mr-2"
+                  />
+                  <label htmlFor="type-all" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    All Items
+                  </label>
+                </div>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <input
+                    type="radio"
+                    id="type-raw"
+                    name="item-type"
+                    checked={selectedItemType === 'raw'}
+                    onChange={() => setSelectedItemType('raw')}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 mr-2"
+                  />
+                  <label htmlFor="type-raw" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    Raw Materials
+                  </label>
+                </div>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <input
+                    type="radio"
+                    id="type-recipe"
+                    name="item-type"
+                    checked={selectedItemType === 'recipe'}
+                    onChange={() => setSelectedItemType('recipe')}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 mr-2"
+                  />
+                  <label htmlFor="type-recipe" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    Recipe Based Items
+                  </label>
+                </div>
+                <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <input
+                    type="radio"
+                    id="type-final"
+                    name="item-type"
+                    checked={selectedItemType === 'final'}
+                    onChange={() => setSelectedItemType('final')}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 mr-2"
+                  />
+                  <label htmlFor="type-final" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    Final Products
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        
         {/* Add Item Button */}
         <button
           onClick={() => setShowAddForm(true)}
@@ -495,6 +639,11 @@ export default function InventoryList({ dateRange }: InventoryListProps) {
                           : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                       }`}>
                         {item.stock_level} {item.unit}
+                        {getAltUnitDisplay(item) && (
+                          <span className="ml-1 text-gray-500 dark:text-gray-400">
+                            {getAltUnitDisplay(item)}
+                          </span>
+                        )}
                         {item.stock_level <= item.reorder_point && (
                           <AlertTriangle className="ml-1 h-3 w-3" />
                         )}
