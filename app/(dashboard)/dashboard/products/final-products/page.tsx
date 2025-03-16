@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Plus, Edit2, Trash2, Search, RefreshCw } from 'lucide-react'
-import { FinalProductForm } from './final-product-form-updated'
+import { FinalProductForm } from './final-product-form'
 import { updateAllCosts } from '@/lib/utils/raw-material-utils'
 
 // Updated Final Product interface with SKU field
