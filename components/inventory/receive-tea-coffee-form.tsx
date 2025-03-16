@@ -12,11 +12,6 @@ interface RawMaterial {
   category: string
 }
 
-interface ProductType {
-  id?: string
-  name: string
-}
-
 interface ReceiveTeaCoffeeFormProps {
   onClose: () => void
   onSuccess?: () => void
@@ -31,8 +26,8 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
   const [searchTerm, setSearchTerm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [userOrganizationId, setUserOrganizationId] = useState<string | null>(null)
 
-  // (Type management UI removed; type will be hardcoded.)
   // State for approved suppliers
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
 
@@ -59,6 +54,7 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
 
   useEffect(() => {
     fetchData()
+    getUserOrganization()
   }, [])
 
   useEffect(() => {
@@ -69,6 +65,19 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
       })
     }
   }, [editItem])
+
+  const getUserOrganization = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // This is a simple implementation - in a real app, you'd fetch the user's organization from a user_profiles table
+        // For now, we'll use the user's ID as a proxy for organization
+        setUserOrganizationId(user.id)
+      }
+    } catch (error) {
+      console.error('Error getting user organization:', error)
+    }
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -158,10 +167,13 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
       if (!formData.supplier) throw new Error('Please select a supplier.')
       if (!formData.invoice_number) throw new Error('Invoice number is required.')
       if (formData.quantity <= 0) throw new Error('Quantity must be greater than zero.')
-      // Note: Batch number, best before date, and package size are now optional.
       
       // Ensure type is set; if empty, default to "tea"
-      const updatedFormData = { ...formData, type: formData.type || 'tea' }
+      const updatedFormData = { 
+        ...formData, 
+        type: formData.type || 'tea',
+        organization_id: userOrganizationId
+      }
       
       // Convert empty optional fields to null to avoid DB errors (especially for dates)
       const dataToSubmit = {
@@ -180,24 +192,48 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
         checked_by: updatedFormData.checked_by,
         total_kg: totalKg,
         price_per_kg: pricePerKg,
-        total_cost: totalCost
+        total_cost: totalCost,
+        organization_id: userOrganizationId
       }
       
       let result
       if (editItem?.id) {
+        // Get the old quantity before updating
+        const { data: oldStockData } = await supabase
+          .from('stock_tea_coffee')
+          .select('quantity')
+          .eq('id', editItem.id)
+          .single()
+        
+        // Update the stock record
         result = await supabase
           .from('stock_tea_coffee')
           .update(dataToSubmit)
           .eq('id', editItem.id)
+        
+        if (result.error) throw result.error
+        
+        // Calculate the difference in quantity for inventory adjustment
+        const oldQuantity = oldStockData?.quantity || 0
+        const quantityDifference = updatedFormData.quantity - oldQuantity
+        
+        // Only update inventory if the difference isn't zero and the item is accepted
+        if (quantityDifference !== 0 && updatedFormData.is_accepted) {
+          await updateInventory(updatedFormData, quantityDifference)
+        }
       } else {
+        // Insert new stock record
         result = await supabase
           .from('stock_tea_coffee')
           .insert(dataToSubmit)
+        
+        if (result.error) throw result.error
+        
+        // Only update inventory if the item is accepted
+        if (updatedFormData.is_accepted) {
+          await updateInventory(updatedFormData)
+        }
       }
-      
-      if (result.error) throw result.error
-      
-      await updateInventory(updatedFormData)
       
       setSuccess('Stock received successfully')
       setTimeout(() => {
@@ -212,53 +248,128 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveTe
     }
   }
 
-  const updateInventory = async (stockItem: TeaCoffeeStock) => {
+  const updateInventory = async (stockItem: TeaCoffeeStock, quantityDifference?: number) => {
     try {
-      const { data: existingItem } = await supabase
+      const quantityToAdd = quantityDifference !== undefined ? quantityDifference : stockItem.quantity;
+      
+      // Skip inventory update if quantity is zero
+      if (quantityToAdd === 0) return;
+      
+      // First, check if this product exists in inventory
+      const { data: existingInventory, error: inventoryQueryError } = await supabase
         .from('inventory')
         .select('*')
         .eq('product_name', stockItem.product_name)
-        .eq('category', stockItem.type)
-        .single()
+        .maybeSingle()
       
-      const stockValue = stockItem.quantity
+      if (inventoryQueryError) throw inventoryQueryError
       
-      if (existingItem) {
-        let quantityAdjustment = stockValue
-        if (editItem?.id) {
-          quantityAdjustment = stockValue - (editItem.quantity || 0)
-        }
-        
-        await supabase
+      // Get the raw material record to ensure we have the correct unit
+      const { data: rawMaterialData, error: rawMaterialError } = await supabase
+        .from('raw_materials')
+        .select('unit, category')
+        .eq('name', stockItem.product_name)
+        .maybeSingle()
+      
+      if (rawMaterialError) throw rawMaterialError
+      
+      // Determine the unit to use - prioritize raw material unit, fallback to kg
+      const unit = rawMaterialData?.unit || 'kg'
+      // Determine the category - prioritize raw material category, fallback to type
+      const category = rawMaterialData?.category || stockItem.type
+      
+      if (existingInventory) {
+        // Update existing inventory record
+        const { error: updateError } = await supabase
           .from('inventory')
           .update({
-            stock_level: existingItem.stock_level + quantityAdjustment,
-            unit_price: stockItem.price_per_unit,
+            stock_level: existingInventory.stock_level + quantityToAdd,
+            unit_price: stockItem.price_per_unit, // Update unit price with latest
             last_updated: new Date().toISOString(),
+            organization_id: userOrganizationId
           })
-          .eq('id', existingItem.id)
+          .eq('id', existingInventory.id)
+        
+        if (updateError) throw updateError
+        
+        // Also create an inventory movement record
+        await createInventoryMovement(
+          existingInventory.id, 
+          stockItem.product_name, 
+          'receive', 
+          quantityToAdd, 
+          stockItem.id || '',
+          stockItem.checked_by
+        )
       } else {
-        const prefix = stockItem.type.substring(0, 3).toUpperCase()
+        // Create new inventory record
+        const prefix = (category || 'mat').substring(0, 3).toUpperCase()
         const timestamp = Date.now().toString().substring(9, 13)
         const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
         const sku = `${prefix}-${timestamp}${random}`
         
-        await supabase
+        const { data: newInventory, error: insertError } = await supabase
           .from('inventory')
           .insert({
             product_name: stockItem.product_name,
-            category: stockItem.type,
             sku: sku,
-            stock_level: stockValue,
+            category: category,
+            stock_level: quantityToAdd,
+            unit: unit,
             unit_price: stockItem.price_per_unit,
-            supplier: stockItem.supplier,
-            reorder_point: 5,
-            unit: 'kg', // Updated unit for KG
+            reorder_point: 5, // Default value
+            is_recipe_based: false,
+            is_final_product: false,
+            last_updated: new Date().toISOString(),
+            organization_id: userOrganizationId
           })
+          .select()
+        
+        if (insertError) throw insertError
+        
+        // Create inventory movement record for new inventory
+        if (newInventory && newInventory.length > 0) {
+          await createInventoryMovement(
+            newInventory[0].id, 
+            stockItem.product_name, 
+            'receive', 
+            quantityToAdd, 
+            stockItem.id || '',
+            stockItem.checked_by
+          )
+        }
       }
     } catch (err) {
       console.error('Error updating inventory:', err)
       throw new Error('Failed to update inventory')
+    }
+  }
+  
+  // Function to create inventory movement record
+  const createInventoryMovement = async (
+    inventoryId: string, 
+    productName: string, 
+    movementType: string, 
+    quantity: number, 
+    referenceId: string,
+    createdBy: string
+  ) => {
+    try {
+      await supabase
+        .from('inventory_movements')
+        .insert({
+          inventory_id: inventoryId,
+          movement_type: movementType,
+          quantity: quantity,
+          reference_id: referenceId,
+          reference_type: 'stock_receipt',
+          notes: `Stock receipt for ${productName}`,
+          created_by: createdBy,
+          organization_id: userOrganizationId
+        })
+    } catch (error) {
+      console.error('Error creating inventory movement:', error)
+      // We'll just log this error but not throw, as it's not critical to the main operation
     }
   }
 
