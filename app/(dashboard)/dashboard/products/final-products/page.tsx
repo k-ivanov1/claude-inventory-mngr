@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Plus, Edit2, Trash2, Search } from 'lucide-react'
-import { FinalProductForm } from './final-product-form'
+import { Plus, Edit2, Trash2, Search, RefreshCw } from 'lucide-react'
+import { FinalProductForm } from './final-product-form-updated'
+import { updateAllCosts } from '@/lib/utils/raw-material-utils'
 
 // Updated Final Product interface with SKU field
 export interface FinalProduct {
   id?: string
   name: string
-  sku: string // Added SKU field
+  sku: string
   recipe_id?: string
   recipe_name?: string
   category: string
@@ -31,6 +32,7 @@ export default function FinalProductsPage() {
   const [categories, setCategories] = useState<string[]>(['tea', 'coffee', 'gear', 'packaging', 'books'])
   const [recipes, setRecipes] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [isUpdatingAllCosts, setIsUpdatingAllCosts] = useState(false)
 
   const supabase = createClientComponentClient()
 
@@ -47,7 +49,7 @@ export default function FinalProductsPage() {
       product.name.toLowerCase().includes(term) ||
       product.category.toLowerCase().includes(term) ||
       (product.recipe_name && product.recipe_name.toLowerCase().includes(term)) ||
-      (product.sku && product.sku.toLowerCase().includes(term)) // Added SKU to search filter
+      (product.sku && product.sku.toLowerCase().includes(term))
     )
     setFilteredProducts(filtered)
   }, [searchTerm, finalProducts])
@@ -95,10 +97,33 @@ export default function FinalProductsPage() {
     }
   }
 
-  // UPDATED fetchRecipes FUNCTION:
   const fetchRecipes = async () => {
     try {
-      // Get recipes with their updated total prices and recipe items
+      // First try to get recipes with pre-calculated costs from a view or function
+      let { data: viewData, error: viewError } = await supabase
+        .from('product_recipes_with_current_costs')
+        .select(`
+          id, 
+          name, 
+          total_price,
+          items:recipe_items(
+            raw_material_id,
+            quantity,
+            unit_cost,
+            total_cost
+          )
+        `)
+        .eq('is_active', true)
+      
+      if (!viewError && viewData) {
+        setRecipes(viewData)
+        return
+      }
+      
+      // Fall back to manual calculation
+      console.log('Falling back to manual calculation for recipe costs')
+      
+      // Get basic recipe data
       const { data, error } = await supabase
         .from('product_recipes')
         .select(`
@@ -106,6 +131,7 @@ export default function FinalProductsPage() {
           name, 
           total_price,
           items:recipe_items(
+            id,
             raw_material_id,
             quantity,
             unit_cost,
@@ -121,11 +147,16 @@ export default function FinalProductsPage() {
         let updatedTotalPrice = 0;
         
         for (const item of recipe.items) {
-          const { data: avgCostData } = await supabase
+          // Try to use the RPC function for average cost
+          const { data: avgCostData, error: rpcError } = await supabase
             .rpc('get_raw_material_avg_cost', { material_id: item.raw_material_id });
           
-          const avgCost = avgCostData || 0;
-          updatedTotalPrice += avgCost * item.quantity;
+          if (!rpcError && avgCostData !== null) {
+            updatedTotalPrice += avgCostData * item.quantity;
+          } else {
+            // Fall back to using the current unit_cost
+            updatedTotalPrice += (item.unit_cost || 0) * item.quantity;
+          }
         }
         
         return {
@@ -137,6 +168,7 @@ export default function FinalProductsPage() {
       setRecipes(updatedRecipes);
     } catch (error) {
       console.error('Error fetching recipes:', error);
+      setError('Failed to load recipes. Please try again.');
     }
   };
 
@@ -167,11 +199,16 @@ export default function FinalProductsPage() {
       // Prepare data for submission
       const dataToSubmit = {
         name: productData.name,
-        sku: productData.sku, // Added SKU to the data submission
+        sku: productData.sku,
         category: productData.category,
         recipe_id: productData.recipe_id,
         is_active: productData.is_active ?? true,
-        unit_price: productData.unit_selling_price
+        unit_price: productData.unit_selling_price,
+        // Also store the calculated values
+        recipe_cost: productData.recipe_cost,
+        markup: productData.markup,
+        profit_margin: productData.profit_margin,
+        profit_per_item: productData.profit_per_item
       }
 
       let result
@@ -228,6 +265,25 @@ export default function FinalProductsPage() {
     setShowForm(true)
   }
 
+  const handleUpdateAllCosts = async () => {
+    setIsUpdatingAllCosts(true)
+    setError(null)
+    
+    try {
+      await updateAllCosts()
+      
+      // Refresh data
+      await fetchRecipes()
+      await fetchFinalProducts()
+      
+    } catch (error: any) {
+      console.error('Error updating costs:', error)
+      setError('Failed to update all costs: ' + error.message)
+    } finally {
+      setIsUpdatingAllCosts(false)
+    }
+  }
+
   return (
     <div className="space-y-8">
       {/* Error Notification */}
@@ -251,16 +307,26 @@ export default function FinalProductsPage() {
 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Final Products</h2>
           <p className="text-gray-600 dark:text-gray-300">Manage your finished products catalog</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingProduct(null)
-            setShowForm(true)
-          }}
-          className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-        >
-          <Plus className="h-5 w-5" />
-          Add Final Product
-        </button>
+        <div className="flex space-x-2">
+          <button
+            onClick={handleUpdateAllCosts}
+            disabled={isUpdatingAllCosts}
+            className="inline-flex items-center gap-x-2 rounded-md bg-green-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-500 disabled:bg-green-400"
+          >
+            <RefreshCw className="h-5 w-5" />
+            {isUpdatingAllCosts ? 'Updating...' : 'Update All Costs'}
+          </button>
+          <button
+            onClick={() => {
+              setEditingProduct(null)
+              setShowForm(true)
+            }}
+            className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+          >
+            <Plus className="h-5 w-5" />
+            Add Final Product
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -405,6 +471,7 @@ export default function FinalProductsPage() {
             setEditingProduct(null)
           }}
           onSubmit={handleAddProduct}
+          onRecipesUpdated={fetchRecipes}
         />
       )}
     </div>
