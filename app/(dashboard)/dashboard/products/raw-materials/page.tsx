@@ -27,9 +27,19 @@ interface InventoryItem {
   average_cost?: number
 }
 
+// Average cost interface from our new view
+interface AverageCost {
+  product_name: string
+  average_cost: number
+  entries_count: number
+  total_quantity: number
+  total_cost: number
+  last_updated: string
+}
+
 export default function RawMaterialsPage() {
-  const [rawMaterials, setRawMaterials] = useState<(RawMaterial & { inventory?: InventoryItem })[]>([])
-  const [filteredMaterials, setFilteredMaterials] = useState<(RawMaterial & { inventory?: InventoryItem })[]>([])
+  const [rawMaterials, setRawMaterials] = useState<(RawMaterial & { inventory?: InventoryItem, averageCost?: AverageCost })[]>([])
+  const [filteredMaterials, setFilteredMaterials] = useState<(RawMaterial & { inventory?: InventoryItem, averageCost?: AverageCost })[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -80,53 +90,43 @@ export default function RawMaterialsPage() {
       const materialIds = formattedMaterials.map(m => m.id)
       
       if (materialIds.length > 0) {
-        // Get stock entries to calculate average cost
-        const { data: stockData, error: stockError } = await supabase
-          .from('stock_tea_coffee')
-          .select('product_name, price_per_unit')
-          .eq('is_accepted', true)
-        
-        if (stockError) throw stockError
-        
-        // Get regular inventory data
+        // Get inventory data
         const { data: inventoryData, error: inventoryError } = await supabase
           .from('inventory')
-          .select('current_stock, unit_price, item_id')
-          .eq('item_type', 'raw_material')
-          .in('item_id', materialIds)
+          .select('id, stock_level, unit_price, product_name')
+          .in('product_name', formattedMaterials.map(m => m.name))
         
         if (inventoryError) throw inventoryError
         
-        // Merge inventory data with raw materials and calculate average costs
-        const materialsWithInventory = formattedMaterials.map(material => {
-          const inventory = inventoryData?.find(inv => inv.item_id === material.id)
-          
-          // Find all stock entries for this material to calculate average cost
-          const materialStockEntries = stockData?.filter(entry => 
-            entry.product_name === material.name
-          ) || []
-          
-          // Calculate average cost if stock entries exist, otherwise use current unit price
-          let averageCost = inventory?.unit_price || 0
-          if (materialStockEntries.length > 0) {
-            const totalCost = materialStockEntries.reduce((sum, entry) => 
-              sum + (entry.price_per_unit || 0), 0
-            )
-            averageCost = totalCost / materialStockEntries.length
-          }
+        // Get average costs from our new view
+        const { data: averageCostData, error: averageCostError } = await supabase
+          .from('inventory_average_costs')
+          .select('*')
+          .in('product_name', formattedMaterials.map(m => m.name))
+        
+        if (averageCostError) throw averageCostError
+        
+        // Merge inventory data and average costs with raw materials
+        const materialsWithData = formattedMaterials.map(material => {
+          const inventory = inventoryData?.find(inv => inv.product_name === material.name)
+          const averageCost = averageCostData?.find(cost => cost.product_name === material.name)
           
           return {
             ...material,
             inventory: inventory ? {
-              item_id: inventory.item_id,
-              current_stock: inventory.current_stock,
-              unit_price: inventory.unit_price,
-              average_cost: averageCost
-            } : undefined
+              item_id: inventory.id,
+              current_stock: inventory.stock_level || 0,
+              unit_price: inventory.unit_price || 0
+            } : {
+              item_id: '',
+              current_stock: 0,
+              unit_price: 0
+            },
+            averageCost: averageCost || undefined
           }
         })
         
-        setRawMaterials(materialsWithInventory)
+        setRawMaterials(materialsWithData)
       } else {
         setRawMaterials(formattedMaterials)
       }
@@ -339,9 +339,11 @@ export default function RawMaterialsPage() {
                       {material.supplier_name || '-'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {material.inventory?.average_cost 
-                        ? `£${material.inventory.average_cost.toFixed(2)}` 
-                        : '-'}
+                      {material.averageCost 
+                        ? `£${material.averageCost.average_cost.toFixed(2)}` 
+                        : (material.inventory?.unit_price 
+                          ? `£${material.inventory.unit_price.toFixed(2)}` 
+                          : '-')}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
