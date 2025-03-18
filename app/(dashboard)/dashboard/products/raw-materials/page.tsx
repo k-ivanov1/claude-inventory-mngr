@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Search, Plus, Edit2, Trash2, RefreshCw } from 'lucide-react'
-import { updateAllCosts, updateRecipeCosts } from '@/lib/utils/raw-material-utils'
+import { RawMaterialForm } from '@/components/products/raw-materials/raw-material-form'
+import { updateAllCosts } from '@/lib/utils/raw-material-utils'
 
 interface RawMaterial {
   id: string
@@ -23,12 +24,15 @@ export default function RawMaterialsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [isUpdatingCosts, setIsUpdatingCosts] = useState(false)
+  const [categories, setCategories] = useState<string[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [editingMaterial, setEditingMaterial] = useState<RawMaterial | null>(null)
 
   const supabase = createClientComponentClient()
 
   useEffect(() => {
     fetchRawMaterials()
+    fetchCategories()
   }, [])
 
   // Filter materials whenever search term changes
@@ -45,6 +49,22 @@ export default function RawMaterialsPage() {
 
     filterMaterials()
   }, [searchTerm, rawMaterials])
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('category')
+        .not('category', 'is', null)
+      
+      if (error) throw error
+      
+      const uniqueCategories = Array.from(new Set(data?.map(item => item.category) || []))
+      setCategories(uniqueCategories)
+    } catch (error: any) {
+      console.error('Error fetching categories:', error)
+    }
+  }
 
   const fetchRawMaterials = async () => {
     setLoading(true)
@@ -74,8 +94,15 @@ export default function RawMaterialsPage() {
       
       if (materialsError) throw materialsError
       
-      // Enhance with average costs
+      // Enhance with average costs and current stock
       const enhancedMaterials = await Promise.all((materialsData || []).map(async (material) => {
+        // Get current stock level from inventory
+        const { data: inventoryData } = await supabase
+          .from('inventory')
+          .select('stock_level')
+          .eq('product_name', material.name)
+          .maybeSingle()
+        
         // Get stock records for this material
         const { data: stockData } = await supabase
           .from('stock_receiving')
@@ -100,7 +127,8 @@ export default function RawMaterialsPage() {
         
         return {
           ...material,
-          avg_cost: avgCost
+          avg_cost: avgCost,
+          current_stock: inventoryData?.stock_level || 0
         }
       }))
       
@@ -113,17 +141,37 @@ export default function RawMaterialsPage() {
     }
   }
 
-  const handleUpdateAllCosts = async () => {
-    setIsUpdatingCosts(true)
-    try {
-      await updateAllCosts()
-      fetchRawMaterials() // Refresh data
-    } catch (error: any) {
-      console.error('Error updating costs:', error)
-      setError('Failed to update costs: ' + error.message)
-    } finally {
-      setIsUpdatingCosts(false)
+  const handleAddMaterial = () => {
+    setEditingMaterial(null)
+    setShowForm(true)
+  }
+  
+  const handleEditMaterial = (material: RawMaterial) => {
+    setEditingMaterial(material)
+    setShowForm(true)
+  }
+  
+  const handleDeleteMaterial = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this material?')) {
+      try {
+        const { error } = await supabase
+          .from('raw_materials')
+          .delete()
+          .eq('id', id)
+        
+        if (error) throw error
+        
+        fetchRawMaterials()
+      } catch (error: any) {
+        console.error('Error deleting material:', error)
+        setError(error.message || 'Failed to delete material')
+      }
     }
+  }
+  
+  const handleFormSubmit = () => {
+    fetchRawMaterials()
+    setShowForm(false)
   }
 
   return (
@@ -152,15 +200,7 @@ export default function RawMaterialsPage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handleUpdateAllCosts}
-            disabled={isUpdatingCosts}
-            className="inline-flex items-center gap-x-2 rounded-md bg-green-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-500 disabled:bg-green-400"
-          >
-            <RefreshCw className="h-5 w-5" />
-            {isUpdatingCosts ? 'Updating...' : 'Update All Costs'}
-          </button>
-          <button
-            onClick={() => {/* Add your create material function here */}}
+            onClick={handleAddMaterial}
             className="inline-flex items-center gap-x-2 rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
           >
             <Plus className="h-5 w-5" />
@@ -261,13 +301,13 @@ export default function RawMaterialsPage() {
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-x-3">
                         <button
-                          onClick={() => {/* Add your edit function here */}}
+                          onClick={() => handleEditMaterial(material)}
                           className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => {/* Add your delete function here */}}
+                          onClick={() => handleDeleteMaterial(material.id)}
                           className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -281,6 +321,16 @@ export default function RawMaterialsPage() {
           </table>
         </div>
       </div>
+
+      {/* Raw Material Form Modal */}
+      {showForm && (
+        <RawMaterialForm
+          material={editingMaterial}
+          categories={categories}
+          onClose={() => setShowForm(false)}
+          onSubmit={handleFormSubmit}
+        />
+      )}
     </div>
   )
 }
