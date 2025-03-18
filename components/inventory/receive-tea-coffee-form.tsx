@@ -159,7 +159,7 @@ export function ReceiveTeaCoffeeForm({
       const pricePerUnit = parseFloat(formData.price_per_unit)
       const totalCost = quantity * pricePerUnit
 
-      // Create stock receiving record
+      // Create stock receiving record - only include fields that exist in the stock_receiving table
       const stockData = {
         date: formData.date,
         item_type: formData.type,
@@ -373,7 +373,7 @@ export function ReceiveTeaCoffeeForm({
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Batch Number*
               </label>
-              <input 
+              <input
                 type="text"
                 name="batch_number"
                 value={formData.batch_number}
