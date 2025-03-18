@@ -7,6 +7,7 @@ import { ChevronLeft, Save, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import BatchInfoForm from '../../../../../../../components/traceability/batch-info-form'
 import BatchChecklistForm from '../../../../../../../components/traceability/batch-checklist-form'
+import { useBatchInventoryIntegration } from '@/lib/hooks/use-batch-inventory-integration'
 
 export default function EditBatchRecordPage() {
   const params = useParams()
@@ -20,6 +21,9 @@ export default function EditBatchRecordPage() {
   const [finalProducts, setFinalProducts] = useState<any[]>([])
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('info') // 'info' or 'checklist'
+
+  // Initialize the batch inventory integration hook
+  useBatchInventoryIntegration();
 
   const [formData, setFormData] = useState({
     date: '',
@@ -95,20 +99,23 @@ export default function EditBatchRecordPage() {
       if (materialsError) throw materialsError
       setRawMaterials(materialsData || [])
 
-      // Fetch batch numbers for materials
+      // Fetch batch numbers for materials from stock_receiving table
       const { data: stockData, error: stockError } = await supabase
-        .from('inventory')
+        .from('stock_receiving')
         .select('*')
-        .gt('quantity', 0)
+        .eq('is_accepted', true)
       
       if (stockError) throw stockError
       
       // Group stock by material name and batch number
       const stockByMaterial: Record<string, any[]> = {}
-      materialsData?.forEach(material => {
-        const materialStock = stockData?.filter(item => item.material_id === material.id) || []
+      for (const material of materialsData || []) {
+        // Find all stock entries for this material
+        const materialStock = stockData?.filter(
+          item => item.item_type === 'raw_material' && item.item_id === material.id
+        ) || []
         
-        // Get unique batch numbers
+        // Get unique batch numbers and available quantities
         const uniqueBatches = materialStock.reduce((acc: any[], current: any) => {
           const exists = acc.find(item => item.batch_number === current.batch_number)
           if (!exists) {
@@ -125,7 +132,7 @@ export default function EditBatchRecordPage() {
         }, [])
         
         stockByMaterial[material.name] = uniqueBatches
-      })
+      }
       
       setBatchNumbers(stockByMaterial)
 
@@ -250,24 +257,6 @@ export default function EditBatchRecordPage() {
       const updatedIngredients = [...prev.ingredients]
       updatedIngredients[index] = { ...updatedIngredients[index], [field]: value }
       
-      // If we changed the raw material or batch number, try to auto-populate the best before date
-      if (field === 'raw_material_id' || field === 'batch_number') {
-        const materialId = updatedIngredients[index].raw_material_id
-        const batchNumber = updatedIngredients[index].batch_number
-        
-        // Find the material name
-        const material = rawMaterials.find(m => m.id === materialId)
-        
-        if (material && batchNumber && batchNumbers[material.name]) {
-          // Find the batch info to get the best before date
-          const batchInfo = batchNumbers[material.name].find(b => b.batch_number === batchNumber)
-          
-          if (batchInfo && batchInfo.best_before_date) {
-            updatedIngredients[index].best_before_date = batchInfo.best_before_date
-          }
-        }
-      }
-      
       return { ...prev, ingredients: updatedIngredients }
     })
   }
@@ -371,6 +360,15 @@ export default function EditBatchRecordPage() {
         work_undertaken: formData.work_undertaken
       }
 
+      // Get original batch data for comparison to determine inventory changes
+      const { data: originalBatch, error: originalError } = await supabase
+        .from('batch_manufacturing_records')
+        .select('bags_count, batch_finished, product_id')
+        .eq('id', batchId)
+        .single()
+      
+      if (originalError) throw originalError
+
       // Update the batch record
       const { error: updateError } = await supabase
         .from('batch_manufacturing_records')
@@ -405,6 +403,130 @@ export default function EditBatchRecordPage() {
             .insert(ingredientsToInsert)
           
           if (insertIngredientsError) throw insertIngredientsError
+          
+          // Update inventory for each ingredient
+          for (const ingredient of ingredientsToInsert) {
+            const material = rawMaterials.find(m => m.id === ingredient.raw_material_id)
+            if (!material) continue
+            
+            // Find inventory record for this material
+            const { data: inventoryItem } = await supabase
+              .from('inventory')
+              .select('*')
+              .eq('product_name', material.name)
+              .maybeSingle()
+              
+            if (inventoryItem) {
+              // Reduce inventory by ingredient quantity
+              await supabase
+                .from('inventory')
+                .update({
+                  stock_level: Math.max(0, inventoryItem.stock_level - ingredient.quantity),
+                  last_updated: new Date().toISOString()
+                })
+                .eq('id', inventoryItem.id)
+              
+              // Create inventory movement record
+              await supabase
+                .from('inventory_movements')
+                .insert({
+                  inventory_id: inventoryItem.id,
+                  movement_type: 'manufacturing_consume',
+                  quantity: -ingredient.quantity, // Negative for consumption
+                  reference_id: batchId,
+                  reference_type: 'batch',
+                  notes: `Used in batch ${formData.product_batch_number}`,
+                  created_at: new Date().toISOString()
+                })
+            }
+          }
+        }
+      }
+      
+      // Handle final product inventory changes
+      if (
+        // If batch was marked as finished in this update
+        (!originalBatch.batch_finished && formData.batch_finished) || 
+        // Or if the number of bags changed for a finished batch
+        (originalBatch.batch_finished && originalBatch.bags_count !== parseInt(formData.bags_count))
+      ) {
+        // Get the product
+        const { data: product } = await supabase
+          .from('final_products')
+          .select('*')
+          .eq('id', formData.product_id)
+          .single()
+          
+        if (product) {
+          // Find inventory for this final product
+          const { data: finalProductInventory } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('product_name', product.name)
+            .eq('is_final_product', true)
+            .maybeSingle()
+            
+          const bagsProduced = parseInt(formData.bags_count) || 0
+          const previousBags = originalBatch.bags_count || 0
+          const bagsDifference = bagsProduced - previousBags
+            
+          if (finalProductInventory) {
+            // Update existing inventory
+            await supabase
+              .from('inventory')
+              .update({
+                stock_level: Math.max(0, finalProductInventory.stock_level + bagsDifference),
+                last_updated: new Date().toISOString()
+              })
+              .eq('id', finalProductInventory.id)
+              
+            // Create inventory movement record
+            await supabase
+              .from('inventory_movements')
+              .insert({
+                inventory_id: finalProductInventory.id,
+                movement_type: 'manufacturing_produce',
+                quantity: bagsDifference,
+                reference_id: batchId,
+                reference_type: 'batch',
+                notes: `Produced in batch ${formData.product_batch_number}`,
+                created_at: new Date().toISOString()
+              })
+          } else {
+            // Create new inventory entry
+            const { data: newInventory, error: insertError } = await supabase
+              .from('inventory')
+              .insert({
+                product_name: product.name,
+                sku: product.sku || generateSKU(product.category || 'prod'),
+                category: product.category || 'finished_product',
+                stock_level: bagsProduced,
+                unit: 'bag',
+                unit_price: product.unit_selling_price || 0,
+                reorder_point: 5, // Default
+                is_recipe_based: true,
+                is_final_product: true,
+                last_updated: new Date().toISOString()
+              })
+              .select()
+              
+            if (insertError) throw insertError
+            
+            // Create inventory movement
+            if (newInventory && newInventory.length > 0) {
+              await supabase
+                .from('inventory_movements')
+                .insert({
+                  inventory_id: newInventory[0].id,
+                  movement_type: 'manufacturing_produce',
+                  quantity: bagsProduced,
+                  reference_id: batchId,
+                  reference_type: 'batch',
+                  notes: `Initial production in batch ${formData.product_batch_number}`,
+                  created_at: new Date().toISOString()
+                })
+            }
+          }
         }
       }
 
@@ -420,6 +542,15 @@ export default function EditBatchRecordPage() {
     } finally {
       setSaving(false)
     }
+  }
+  
+  // Helper function to generate SKU
+  const generateSKU = (category: string) => {
+    const prefix = category.substring(0, 3).toUpperCase()
+    const timestamp = Date.now().toString().substring(9, 13)
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+    
+    return `${prefix}-${timestamp}${random}`
   }
 
   return (
