@@ -20,6 +20,7 @@ interface RawMaterial {
   is_recipe_based?: boolean
   is_final_product?: boolean
   average_cost?: number // Added for cost tracking
+  manufactured_quantity?: number // Added to show how much was manufactured
 }
 
 export default function RawMaterialsView() {
@@ -48,7 +49,7 @@ export default function RawMaterialsView() {
       )
       setFilteredMaterials(filtered)
     } else {
-      setFilteredMaterials(rawMaterials)
+     setFilteredMaterials(rawMaterials)
     }
   }, [searchTerm, rawMaterials])
 
@@ -91,52 +92,71 @@ export default function RawMaterialsView() {
     setLoading(true)
     setError(null)
     try {
-      // First, fetch inventory items that are raw materials
+      // First, fetch inventory items
       const { data, error } = await supabase
         .from('inventory')
         .select('*')
-        .eq('is_recipe_based', false)
-        .eq('is_final_product', false)
         .order('product_name', { ascending: true })
       
       if (error) throw error
 
       // Get supplier information
       const enhancedMaterials = await Promise.all((data || []).map(async (material) => {
-        if (material.supplier) {
-          // Try to get supplier name from suppliers table
-          const { data: supplierData } = await supabase
-            .from('suppliers')
-            .select('name')
-            .eq('id', material.supplier)
-            .single()
+        // Get information based on whether it's a raw material or final product
+        if (material.is_final_product) {
+          // For final products, fetch manufacturing data to show how much was manufactured
+          const { data: batchData } = await supabase
+            .from('batch_manufacturing_records')
+            .select('bags_count, batch_size')
+            .eq('product_id', material.id)
+          
+          let manufacturedQuantity = 0
+          if (batchData && batchData.length > 0) {
+            // Sum all bags produced across all batches
+            manufacturedQuantity = batchData.reduce((sum, batch) => sum + (batch.bags_count || 0), 0)
+          }
+          
+          return {
+            ...material,
+            manufactured_quantity: manufacturedQuantity
+          }
+        } else {
+          // For raw materials
+          if (material.supplier) {
+            // Try to get supplier name from suppliers table
+            const { data: supplierData } = await supabase
+              .from('suppliers')
+              .select('name')
+              .eq('id', material.supplier)
+              .single()
 
-          if (supplierData) {
-            return {
-              ...material,
-              supplier_name: supplierData.name
+            if (supplierData) {
+              return {
+                ...material,
+                supplier_name: supplierData.name
+              }
             }
           }
-        }
 
-        // Get average cost from stock entries if available
-        const { data: stockData } = await supabase
-          .from('stock_tea_coffee')
-          .select('price_per_unit')
-          .eq('product_name', material.product_name)
-          .eq('is_accepted', true)
+          // Get average cost from stock entries if available
+          const { data: stockData } = await supabase
+            .from('stock_tea_coffee')
+            .select('price_per_unit')
+            .eq('product_name', material.product_name)
+            .eq('is_accepted', true)
 
-        let averageCost = material.unit_price
-        if (stockData && stockData.length > 0) {
-          const totalCost = stockData.reduce((sum, entry) => 
-            sum + (entry.price_per_unit || 0), 0
-          )
-          averageCost = totalCost / stockData.length
-        }
+          let averageCost = material.unit_price
+          if (stockData && stockData.length > 0) {
+            const totalCost = stockData.reduce((sum, entry) => 
+              sum + (entry.price_per_unit || 0), 0
+            )
+            averageCost = totalCost / stockData.length
+          }
 
-        return {
-          ...material,
-          average_cost: averageCost
+          return {
+            ...material,
+            average_cost: averageCost
+          }
         }
       }))
 
@@ -172,8 +192,8 @@ export default function RawMaterialsView() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Raw Materials</h2>
-          <p className="text-gray-600 dark:text-gray-300">Track and manage your raw materials inventory</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Inventory</h2>
+          <p className="text-gray-600 dark:text-gray-300">Track and manage your inventory</p>
         </div>
       </div>
 
@@ -188,7 +208,7 @@ export default function RawMaterialsView() {
                 </svg>
               </div>
               <div className="ml-5 w-0 flex-1">
-                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Raw Materials</dt>
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Items</dt>
                 <dd className="flex items-baseline">
                   <span className="text-2xl font-semibold text-gray-900 dark:text-white">{filteredMaterials.length}</span>
                 </dd>
@@ -246,7 +266,7 @@ export default function RawMaterialsView() {
         />
       </div>
 
-      {/* Raw Materials Table */}
+      {/* Inventory Table */}
       <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 sm:rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -283,6 +303,15 @@ export default function RawMaterialsView() {
                   </div>
                 </th>
                 <th 
+                  onClick={() => sortMaterials('is_final_product')}
+                  className="px-4 py-3.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <div className="flex items-center">
+                    Type
+                    <ArrowUpDown className="ml-1 h-4 w-4" />
+                  </div>
+                </th>
+                <th 
                   onClick={() => sortMaterials('unit_price')}
                   className="px-4 py-3.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
@@ -301,20 +330,11 @@ export default function RawMaterialsView() {
                   </div>
                 </th>
                 <th 
-                  onClick={() => sortMaterials('supplier')}
+                  onClick={() => sortMaterials('manufactured_quantity')}
                   className="px-4 py-3.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   <div className="flex items-center">
-                    Supplier
-                    <ArrowUpDown className="ml-1 h-4 w-4" />
-                  </div>
-                </th>
-                <th 
-                  onClick={() => sortMaterials('reorder_point')}
-                  className="px-4 py-3.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <div className="flex items-center">
-                    Reorder Point
+                    Manufactured
                     <ArrowUpDown className="ml-1 h-4 w-4" />
                   </div>
                 </th>
@@ -327,13 +347,13 @@ export default function RawMaterialsView() {
               {loading ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                    Loading raw materials...
+                    Loading inventory...
                   </td>
                 </tr>
               ) : filteredMaterials.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                    No raw materials found.
+                    No inventory items found.
                   </td>
                 </tr>
               ) : (
@@ -363,6 +383,9 @@ export default function RawMaterialsView() {
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {material.is_final_product ? 'Final Product' : 'Raw Material'}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       £{material.unit_price.toFixed(2)}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -371,10 +394,9 @@ export default function RawMaterialsView() {
                         : `£${material.unit_price.toFixed(2)}`}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {material.supplier_name || material.supplier || '-'}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {material.reorder_point} {material.unit}
+                      {material.is_final_product && material.manufactured_quantity 
+                        ? `${material.manufactured_quantity} bags` 
+                        : '-'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(material.last_updated)}
