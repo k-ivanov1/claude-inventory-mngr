@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Plus, Trash2, AlertCircle, InfoIcon } from 'lucide-react'
 
 export interface BatchInfoFormProps {
@@ -83,15 +83,35 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
     return (bags * bagSize).toFixed(2)
   }
 
-  // When a batch number is changed for an ingredient, update the field
+  // When a raw material is selected, fetch and populate available batch numbers
+  const handleRawMaterialChange = (index: number, materialId: string) => {
+    updateIngredient(index, 'raw_material_id', materialId)
+    
+    // Clear batch number and best before date when material changes
+    updateIngredient(index, 'batch_number', '')
+    updateIngredient(index, 'best_before_date', '')
+  }
+
+  // When a batch number is changed for an ingredient, auto-populate the best before date
   const handleBatchNumberChange = (index: number, batchNumber: string) => {
-    // Just calling updateIngredient will handle the best_before_date auto-population
-    // since we've enhanced that function in the parent component
     updateIngredient(index, 'batch_number', batchNumber)
+    
+    // Find the material
+    const materialId = formData.ingredients[index].raw_material_id
+    const material = rawMaterials.find(m => m.id === materialId)
+    
+    if (material && material.name && batchNumbers[material.name]) {
+      // Find the batch info to get the best before date
+      const batchInfo = batchNumbers[material.name].find(b => b.batch_number === batchNumber)
+      
+      if (batchInfo && batchInfo.best_before_date) {
+        updateIngredient(index, 'best_before_date', batchInfo.best_before_date)
+      }
+    }
   }
 
   // Update batch_size whenever bags_count or bag_size changes
-  React.useEffect(() => {
+  useEffect(() => {
     const calculatedSize = calculateTotalBatchSize()
     if (calculatedSize !== formData.batch_size) {
       const e = {
@@ -305,7 +325,7 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
         </div>
 
         <div className="mt-3 space-y-3">
-          {formData.ingredients.map((ingredient: any, index: number) => {
+          {formData.ingredients.map((ingredient, index) => {
             // Get raw material details
             const rawMaterial = ingredient.raw_material_id ? 
               rawMaterials.find(m => m.id === ingredient.raw_material_id) : null;
@@ -339,7 +359,7 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Raw Material *</label>
                     <select
                       value={ingredient.raw_material_id}
-                      onChange={(e) => updateIngredient(index, 'raw_material_id', e.target.value)}
+                      onChange={(e) => handleRawMaterialChange(index, e.target.value)}
                       className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       required
                     >
@@ -403,7 +423,7 @@ const BatchInfoForm: React.FC<BatchInfoFormProps> = ({
                       min="0"
                       max={maxAvailableKg > 0 ? maxAvailableKg : undefined}
                       className={`mt-1 block w-full rounded-md border ${
-                        ingredient.quantity && parseFloat(ingredient.quantity) > maxAvailableKg && maxAvailableKg > 0
+                        ingredient.quantity && parseFloat(ingredient.quantity) > maxAvailableKg && maxAvailableKg >0
                           ? 'border-red-300 dark:border-red-600'
                           : 'border-gray-300 dark:border-gray-600'
                       } px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
