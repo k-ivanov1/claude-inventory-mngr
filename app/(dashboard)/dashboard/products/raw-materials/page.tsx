@@ -16,6 +16,7 @@ interface RawMaterial {
   current_stock: number
   avg_cost: number
   is_active: boolean
+  reorder_point: number
 }
 
 export default function RawMaterialsPage() {
@@ -146,10 +147,17 @@ export default function RawMaterialsPage() {
     setShowForm(true)
   }
   
-  const handleEditMaterial = (material: RawMaterial) => {
-    setEditingMaterial(material)
-    setShowForm(true)
-  }
+const handleEditMaterial = (material: RawMaterial) => {
+  // Make sure the material object has all required properties for the form
+  const formattedMaterial = {
+    ...material,
+    // Map min_stock_level to reorder_point if it doesn't exist
+    reorder_point: material.reorder_point || material.min_stock_level
+  };
+  
+  setEditingMaterial(formattedMaterial);
+  setShowForm(true);
+}
   
   const handleDeleteMaterial = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this material?')) {
