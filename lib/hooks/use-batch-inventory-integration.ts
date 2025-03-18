@@ -60,12 +60,24 @@ export function useBatchInventoryIntegration() {
       // 3. Reduce the inventory of raw materials used
       if (ingredients && ingredients.length > 0) {
         for (const ingredient of ingredients) {
+          // Get material details
+          const { data: material, error: materialError } = await supabase
+            .from('raw_materials')
+            .select('name')
+            .eq('id', ingredient.raw_material_id)
+            .single()
+            
+          if (materialError) {
+            console.error('Error fetching material details:', materialError)
+            continue
+          }
+          
           // Get current inventory for this raw material
           const { data: inventoryItem, error: inventoryError } = await supabase
             .from('inventory')
             .select('*')
-            .eq('id', ingredient.raw_material_id)
-            .single()
+            .eq('product_name', material?.name)
+            .maybeSingle()
 
           if (inventoryError) {
             console.error('Error fetching inventory for ingredient:', inventoryError)
@@ -89,116 +101,118 @@ export function useBatchInventoryIntegration() {
               -ingredient.quantity,  // Negative because it's consumption
               newBatch.id,
               'batch_manufacturing',
-              `Used in batch ${newBatch.batch_number}`
+              `Used in batch ${newBatch.product_batch_number}`
             )
           }
         }
       }
 
-      // 4. Add or update the final product in inventory using BAGS not kg
-      // Check if this product already exists in inventory
-      const { data: existingProduct, error: existingProductError } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('product_name', product.name)
-        .eq('is_final_product', true)
-        .maybeSingle()
-
-      if (existingProductError) throw existingProductError
-
-      // Calculate the quantity produced in BAGS, not kg
-      // This is the key change: we're counting bags, not using batch_size (which is in kg)
-      const producedQuantity = newBatch.bags_count || 1 // Default to 1 if not specified
-
-      if (existingProduct) {
-        // Update existing inventory entry
-        await supabase
+      // Only add final product to inventory if the batch is finished
+      if (newBatch.batch_finished) {
+        // 4. Add or update the final product in inventory using BAGS not kg
+        // Check if this product already exists in inventory
+        const { data: existingProduct, error: existingProductError } = await supabase
           .from('inventory')
-          .update({
-            stock_level: existingProduct.stock_level + producedQuantity,
-            last_updated: new Date().toISOString()
-          })
-          .eq('id', existingProduct.id)
+          .select('*')
+          .eq('product_name', product.name)
+          .eq('is_final_product', true)
+          .maybeSingle()
+
+        if (existingProductError) throw existingProductError
+
+        // Calculate the quantity produced in BAGS, not kg
+        const producedQuantity = newBatch.bags_count || 1 // Default to 1 if not specified
+
+        if (existingProduct) {
+          // Update existing inventory entry
+          await supabase
+            .from('inventory')
+            .update({
+              stock_level: existingProduct.stock_level + producedQuantity,
+              last_updated: new Date().toISOString()
+            })
+            .eq('id', existingProduct.id)
           
-        // Create inventory movement record for production
-        await createInventoryMovement(
-          existingProduct.id,
-          'manufacturing_produce',
-          producedQuantity,  // Positive because it's production
-          newBatch.id,
-          'batch_manufacturing',
-          `Produced in batch ${newBatch.batch_number}`
-        )
-      } else {
-        // Create new inventory entry for this final product
-        const { data: newInventory, error: insertError } = await supabase
-          .from('inventory')
-          .insert({
-            product_name: product.name,
-            sku: product.sku || generateSKU(product.category),
-            category: product.category,
-            stock_level: producedQuantity,
-            unit: 'bag', // Explicitly set unit to bag for final products
-            unit_price: product.unit_selling_price || 0,
-            reorder_point: 5, // Default value, could be customized
-            is_recipe_based: true,
-            is_final_product: true,
-            last_updated: new Date().toISOString()
-          })
-          .select()
-        
-        if (insertError) throw insertError
-        
-        // Create inventory movement record for the new product
-        if (newInventory && newInventory.length > 0) {
+          // Create inventory movement record for production
           await createInventoryMovement(
-            newInventory[0].id,
+            existingProduct.id,
             'manufacturing_produce',
-            producedQuantity,
+            producedQuantity,  // Positive because it's production
             newBatch.id,
             'batch_manufacturing',
-            `Initial production in batch ${newBatch.batch_number}`
+            `Produced in batch ${newBatch.product_batch_number}`
           )
-        }
-      }
-
-      // 5. Create batch record in the unit_conversions table if needed
-      // This helps with conversions between kg and bags for this product
-      // Calculate kg per bag for this batch
-      const kgPerBag = newBatch.batch_size / newBatch.bags_count
-      
-      try {
-        // Check if a conversion already exists for this product
-        const { data: existingConversion, error: conversionError } = await supabase
-          .from('material_unit_conversions')
-          .select('*')
-          .eq('material_id', product.id)
-          .maybeSingle()
-          
-        if (conversionError) throw conversionError
-        
-        if (existingConversion) {
-          // Update the conversion rate with the latest value
-          await supabase
-            .from('material_unit_conversions')
-            .update({
-              conversion_rate: kgPerBag
-            })
-            .eq('id', existingConversion.id)
         } else {
-          // Create a new conversion record
-          await supabase
-            .from('material_unit_conversions')
+          // Create new inventory entry for this final product
+          const { data: newInventory, error: insertError } = await supabase
+            .from('inventory')
             .insert({
-              material_id: product.id,
-              base_unit: 'bag',
-              conversion_unit: 'kg',
-              conversion_rate: kgPerBag
+              product_name: product.name,
+              sku: product.sku || generateSKU(product.category),
+              category: product.category,
+              stock_level: producedQuantity,
+              unit: 'bag', // Explicitly set unit to bag for final products
+              unit_price: product.unit_selling_price || 0,
+              reorder_point: 5, // Default value, could be customized
+              is_recipe_based: true,
+              is_final_product: true,
+              last_updated: new Date().toISOString()
             })
+            .select()
+          
+          if (insertError) throw insertError
+          
+          // Create inventory movement record for the new product
+          if (newInventory && newInventory.length > 0) {
+            await createInventoryMovement(
+              newInventory[0].id,
+              'manufacturing_produce',
+              producedQuantity,
+              newBatch.id,
+              'batch_manufacturing',
+              `Initial production in batch ${newBatch.product_batch_number}`
+            )
+          }
         }
-      } catch (error) {
-        console.error('Error updating unit conversion:', error)
-        // Non-critical error, continue
+
+        // 5. Create batch record in the unit_conversions table if needed
+        // This helps with conversions between kg and bags for this product
+        // Calculate kg per bag for this batch
+        const kgPerBag = newBatch.batch_size / newBatch.bags_count
+        
+        try {
+          // Check if a conversion already exists for this product
+          const { data: existingConversion, error: conversionError } = await supabase
+            .from('material_unit_conversions')
+            .select('*')
+            .eq('material_id', product.id)
+            .maybeSingle()
+            
+          if (conversionError) throw conversionError
+          
+          if (existingConversion) {
+            // Update the conversion rate with the latest value
+            await supabase
+              .from('material_unit_conversions')
+              .update({
+                conversion_rate: kgPerBag
+              })
+              .eq('id', existingConversion.id)
+          } else {
+            // Create a new conversion record
+            await supabase
+              .from('material_unit_conversions')
+              .insert({
+                material_id: product.id,
+                base_unit: 'bag',
+                conversion_unit: 'kg',
+                conversion_rate: kgPerBag
+              })
+          }
+        } catch (error) {
+          console.error('Error updating unit conversion:', error)
+          // Non-critical error, continue
+        }
       }
 
       console.log('Batch inventory integration complete for new batch:', newBatch.id)
@@ -241,8 +255,89 @@ export function useBatchInventoryIntegration() {
     
     if (!oldBatch || !newBatch || !newBatch.id) return
     
+    // If batch status changed from in-progress to completed (batch_finished set)
+    if (!oldBatch.batch_finished && newBatch.batch_finished) {
+      try {
+        // Handle as a new batch record but for the final product part only
+        const { data: product, error: productError } = await supabase
+          .from('final_products')
+          .select('*')
+          .eq('id', newBatch.product_id)
+          .single()
+
+        if (productError) throw productError
+        
+        // Add to inventory - follow the same steps as in handleNewBatchRecord
+        // Check if this product already exists in inventory
+        const { data: existingProduct, error: existingProductError } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('product_name', product.name)
+          .eq('is_final_product', true)
+          .maybeSingle()
+
+        if (existingProductError) throw existingProductError
+
+        const producedQuantity = newBatch.bags_count || 1
+
+        if (existingProduct) {
+          // Update existing inventory entry
+          await supabase
+            .from('inventory')
+            .update({
+              stock_level: existingProduct.stock_level + producedQuantity,
+              last_updated: new Date().toISOString()
+            })
+            .eq('id', existingProduct.id)
+          
+          // Create inventory movement record
+          await createInventoryMovement(
+            existingProduct.id,
+            'manufacturing_produce',
+            producedQuantity,
+            newBatch.id,
+            'batch_manufacturing',
+            `Produced in batch ${newBatch.product_batch_number}, marked as completed`
+          )
+        } else {
+          // Create new inventory entry
+          const { data: newInventory, error: insertError } = await supabase
+            .from('inventory')
+            .insert({
+              product_name: product.name,
+              sku: product.sku || generateSKU(product.category),
+              category: product.category,
+              stock_level: producedQuantity,
+              unit: 'bag',
+              unit_price: product.unit_selling_price || 0,
+              reorder_point: 5,
+              is_recipe_based: true,
+              is_final_product: true,
+              last_updated: new Date().toISOString()
+            })
+            .select()
+            
+          if (insertError) throw insertError
+            
+          // Create inventory movement record
+          if (newInventory && newInventory.length > 0) {
+            await createInventoryMovement(
+              newInventory[0].id,
+              'manufacturing_produce',
+              producedQuantity,
+              newBatch.id,
+              'batch_manufacturing',
+              `Initial production in batch ${newBatch.product_batch_number}, marked as completed`
+            )
+          }
+        }
+      } catch (error) {
+        console.error('Error handling batch completion:', error)
+      }
+    }
+    
     // If bags_count changed, we need to update inventory
-    if (oldBatch.bags_count !== newBatch.bags_count) {
+    else if (oldBatch.batch_finished && newBatch.batch_finished && oldBatch.bags_count !== newBatch.bags_count) {
       try {
         // Get the product details
         const { data: product, error: productError } = await supabase
@@ -286,7 +381,7 @@ export function useBatchInventoryIntegration() {
             bagsDifference,
             newBatch.id,
             'batch_manufacturing',
-            `Batch ${newBatch.batch_number} updated from ${oldBatch.bags_count} to ${newBatch.bags_count} bags`
+            `Batch ${newBatch.product_batch_number} updated from ${oldBatch.bags_count} to ${newBatch.bags_count} bags`
           )
           
           // Update the unit conversion if batch_size also changed
