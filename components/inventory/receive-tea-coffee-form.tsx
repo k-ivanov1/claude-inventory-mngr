@@ -2,87 +2,78 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { X } from 'lucide-react'
-import { TeaCoffeeStock } from '@/lib/types/stock'
+import { X, Plus } from 'lucide-react'
 import { updateCostsForMaterial } from '@/lib/utils/raw-material-utils'
 
-interface ReceiveFormProps {
+interface TeaCoffeeStockProps {
   onClose: () => void
   onSuccess: () => void
-  editItem?: TeaCoffeeStock
+  editItem?: any
 }
 
-export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFormProps) {
-  const [rawMaterials, setRawMaterials] = useState<any[]>([])
-  const [finalProducts, setFinalProducts] = useState<any[]>([])
-  const [suppliers, setSuppliers] = useState<any[]>([])
+export function ReceiveTeaCoffeeForm({ 
+  onClose, 
+  onSuccess,
+  editItem
+}: TeaCoffeeStockProps) {
   const [loading, setLoading] = useState(false)
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [products, setProducts] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
-  
-  // Default form data
-  const initialFormData: TeaCoffeeStock = {
+  const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    type: 'raw_material',
     product_name: '',
     supplier: '',
     invoice_number: '',
+    quantity: '1',
+    price_per_unit: '0',
     batch_number: '',
     best_before_date: '',
-    quantity: 0,
-    package_size: 0,
-    price_per_unit: 0,
+    type: 'raw_material',
+    package_size: '250',
     is_damaged: false,
     labelling_matches_specifications: true,
     is_accepted: true,
     checked_by: ''
-  }
-  
-  const [formData, setFormData] = useState<TeaCoffeeStock>(initialFormData)
-  const [selectedItemId, setSelectedItemId] = useState<string>('')
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')
-  
+  })
+
   const supabase = createClientComponentClient()
-  
-  // Load edit data if provided
+
   useEffect(() => {
     if (editItem) {
-      setFormData(editItem)
+      // Format the date from ISO to YYYY-MM-DD for the date input
+      const formattedDate = editItem.date 
+        ? new Date(editItem.date).toISOString().split('T')[0]
+        : ''
+      
+      // Format the best before date if it exists
+      const formattedBBDate = editItem.best_before_date 
+        ? new Date(editItem.best_before_date).toISOString().split('T')[0]
+        : ''
+      
+      setFormData({
+        date: formattedDate,
+        product_name: editItem.product_name || '',
+        supplier: editItem.supplier || '',
+        invoice_number: editItem.invoice_number || '',
+        quantity: editItem.quantity?.toString() || '1',
+        price_per_unit: editItem.price_per_unit?.toString() || '0',
+        batch_number: editItem.batch_number || '',
+        best_before_date: formattedBBDate,
+        type: editItem.type || 'raw_material',
+        package_size: editItem.package_size?.toString() || '250',
+        is_damaged: editItem.is_damaged || false,
+        labelling_matches_specifications: editItem.labelling_matches_specifications ?? true,
+        is_accepted: editItem.is_accepted ?? true,
+        checked_by: editItem.checked_by || ''
+      })
     }
     
-    loadRawMaterials()
-    loadFinalProducts()
-    loadSuppliers()
+    fetchSuppliers()
+    fetchProducts()
   }, [editItem])
-  
-  const loadRawMaterials = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('raw_materials')
-        .select('*')
-        .order('name')
-      
-      if (error) throw error
-      setRawMaterials(data || [])
-    } catch (error) {
-      console.error('Error loading raw materials:', error)
-    }
-  }
-  
-  const loadFinalProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('final_products')
-        .select('*')
-        .order('name')
-      
-      if (error) throw error
-      setFinalProducts(data || [])
-    } catch (error) {
-      console.error('Error loading final products:', error)
-    }
-  }
-  
-  const loadSuppliers = async () => {
+
+  const fetchSuppliers = async () => {
     try {
       const { data, error } = await supabase
         .from('suppliers')
@@ -90,24 +81,41 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFo
         .order('name')
       
       if (error) throw error
+
       setSuppliers(data || [])
-    } catch (error) {
-      console.error('Error loading suppliers:', error)
+    } catch (err) {
+      console.error('Error loading suppliers:', err)
+      setError('Failed to load suppliers')
     }
   }
-  
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target as HTMLInputElement
+
+  const fetchProducts = async () => {
+    try {
+      // Fetch raw materials from the raw_materials table
+      const { data, error } = await supabase
+        .from('raw_materials')
+        .select('id, name, unit, category')
+        .eq('is_active', true)
+        .order('name')
+      
+      if (error) throw error
+
+      setProducts(data || [])
+    } catch (err) {
+      console.error('Error loading products:', err)
+      setError('Failed to load products')
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target
     
+    // Handle checkbox inputs
     if (type === 'checkbox') {
+      const target = e.target as HTMLInputElement
       setFormData({
         ...formData,
-        [name]: (e.target as HTMLInputElement).checked
-      })
-    } else if (type === 'number') {
-      setFormData({
-        ...formData,
-        [name]: parseFloat(value) || 0
+        [name]: target.checked
       })
     } else {
       setFormData({
@@ -115,111 +123,59 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFo
         [name]: value
       })
     }
-    
-    // Calculate derived values
-    if (name === 'quantity' || name === 'price_per_unit' || name === 'package_size') {
-      const quantity = name === 'quantity' ? parseFloat(value) || 0 : formData.quantity
-      const pricePerUnit = name === 'price_per_unit' ? parseFloat(value) || 0 : formData.price_per_unit
-      const packageSize = name === 'package_size' ? parseFloat(value) || 0 : formData.package_size
-      
-      // Calculate total cost
-      const totalCost = quantity * pricePerUnit
-      
-      // Calculate total kg and price per kg for tea/coffee
-      let totalKg = 0
-      let pricePerKg = 0
-      
-      if (packageSize > 0) {
-        totalKg = (quantity * packageSize) / 1000 // Convert g to kg
-        pricePerKg = packageSize > 0 ? pricePerUnit / (packageSize / 1000) : 0
-      }
-      
-      setFormData(prev => ({
-        ...prev,
-        total_cost: totalCost,
-        total_kg: totalKg,
-        price_per_kg: pricePerKg
-      }))
-    }
   }
-  
-  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value
-    setFormData({
-      ...formData,
-      type: value as TeaCoffeeStock['type']
-    })
+
+  const calculateTotalCost = () => {
+    const quantity = parseFloat(formData.quantity) || 0
+    const pricePerUnit = parseFloat(formData.price_per_unit) || 0
+    return (quantity * pricePerUnit).toFixed(2)
   }
-  
-  const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedId = e.target.value
-    setSelectedItemId(selectedId)
-    
-    // Find the selected product name based on the type
-    if (formData.type === 'raw_material') {
-      const selectedMaterial = rawMaterials.find(m => m.id === selectedId)
-      if (selectedMaterial) {
-        setFormData({
-          ...formData,
-          product_name: selectedMaterial.name
-        })
-      }
-    } else if (formData.type === 'final_product') {
-      const selectedProduct = finalProducts.find(p => p.id === selectedId)
-      if (selectedProduct) {
-        setFormData({
-          ...formData,
-          product_name: selectedProduct.name
-        })
-      }
-    }
-  }
-  
-  const handleSupplierChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedId = e.target.value
-    setSelectedSupplierId(selectedId)
-    
-    const selectedSupplier = suppliers.find(s => s.id === selectedId)
-    if (selectedSupplier) {
-      setFormData({
-        ...formData,
-        supplier: selectedSupplier.name
-      })
-    }
-  }
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
     setLoading(true)
-    
+    setError(null)
+
     try {
       // Validate required fields
-      if (!formData.date || !formData.product_name || !formData.supplier || !formData.invoice_number) {
-        throw new Error('Please fill in all required fields')
+      if (!formData.date || !formData.product_name || !formData.supplier) {
+        throw new Error('Please complete all required fields')
       }
-      
-      if (formData.quantity <= 0) {
-        throw new Error('Quantity must be greater than zero')
+
+      // Find the selected product details
+      const selectedProduct = products.find(p => p.name === formData.product_name)
+      if (!selectedProduct && formData.type === 'raw_material') {
+        throw new Error('Selected product not found in raw materials')
       }
-      
-      // Prepare data for submission to the stock_receiving table
+
+      // Find supplier ID from supplier name
+      const selectedSupplier = suppliers.find(s => s.name === formData.supplier)
+      if (!selectedSupplier) {
+        throw new Error('Selected supplier not found')
+      }
+
+      // Convert string values to numbers
+      const quantity = parseFloat(formData.quantity)
+      const pricePerUnit = parseFloat(formData.price_per_unit)
+      const totalCost = quantity * pricePerUnit
+
+      // Create stock receiving record
       const stockData = {
         date: formData.date,
         item_type: formData.type,
-        item_id: selectedItemId,
-        supplier_id: selectedSupplierId,
+        item_id: selectedProduct?.id,
+        supplier_id: selectedSupplier.id,
         batch_number: formData.batch_number,
-        quantity: formData.quantity,
-        unit_price: formData.price_per_unit,
-        total_cost: formData.total_cost,
+        quantity: quantity,
+        unit_price: pricePerUnit,
+        total_cost: totalCost,
         invoice_number: formData.invoice_number,
         best_before_date: formData.best_before_date || null,
         is_accepted: formData.is_accepted,
-        checked_by: formData.checked_by,
-        notes: ''
+        notes: formData.is_damaged ? 'Damaged on arrival' : '',
+        checked_by: formData.checked_by
       }
-      
+
       let result
       
       if (editItem?.id) {
@@ -234,60 +190,112 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFo
           .from('stock_receiving')
           .insert(stockData)
       }
-      
+
       if (result.error) throw result.error
 
-      // Update costs for this material (if it's a raw material)
-      if (formData.type === 'raw_material' && selectedItemId) {
-        console.log('Updating costs for material:', selectedItemId)
-        await updateCostsForMaterial(selectedItemId)
+      // Update inventory if stock is accepted
+      if (formData.is_accepted) {
+        // Check if item already exists in inventory
+        const { data: existingItem } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('product_name', formData.product_name)
+          .maybeSingle()
+
+        if (existingItem) {
+          // Update existing inventory item
+          await supabase
+            .from('inventory')
+            .update({
+              stock_level: existingItem.stock_level + quantity,
+              last_updated: new Date().toISOString()
+            })
+            .eq('id', existingItem.id)
+        } else {
+          // Create new inventory item
+          await supabase
+            .from('inventory')
+            .insert({
+              product_name: formData.product_name,
+              sku: selectedProduct?.sku || generateSKU(selectedProduct?.category || 'raw'),
+              category: selectedProduct?.category || 'uncategorized',
+              stock_level: quantity,
+              unit: selectedProduct?.unit || 'kg',
+              unit_price: pricePerUnit,
+              reorder_point: 5, // Default reorder point
+              is_recipe_based: false,
+              is_final_product: false,
+              last_updated: new Date().toISOString()
+            })
+        }
+
+        // If it's a raw material, update recipe costs that use this material
+        if (formData.type === 'raw_material' && selectedProduct?.id) {
+          await updateCostsForMaterial(selectedProduct.id)
+        }
       }
-      
+
+      // Call success callback
       onSuccess()
-      onClose()
-    } catch (error: any) {
-      console.error('Error saving stock:', error)
-      setError(error.message || 'Failed to save stock. Please try again.')
-    } finally {
+
+    } catch (err: any) {
+      console.error('Error saving stock:', err)
+      setError(err.message || 'An error occurred while saving the stock')
       setLoading(false)
     }
   }
-  
+
+  // Helper function to generate SKU
+  const generateSKU = (category: string) => {
+    const prefix = category.substring(0, 3).toUpperCase()
+    const timestamp = Date.now().toString().substring(9, 13)
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+    
+    return `${prefix}-${timestamp}${random}`
+  }
+
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full p-6 overflow-y-auto max-h-[90vh]">
-        {/* Form Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {editItem ? 'Edit Stock Item' : 'Receive New Stock'}
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white dark:bg-gray-800">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            {editItem ? 'Edit Stock Entry' : 'Receive New Stock'}
           </h3>
-          <button 
+          <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500"
+            className="text-gray-400 hover:text-gray-500 focus:outline-none"
           >
-            <X className="h-5 w-5" />
+            <X className="h-6 w-6" />
           </button>
         </div>
 
-        {/* Error Message */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative mb-4" role="alert">
+          <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900 dark:border-red-700 dark:text-red-100" role="alert">
             <span className="block sm:inline">{error}</span>
-            <span 
-              className="absolute top-0 bottom-0 right-0 px-4 py-3"
-              onClick={() => setError(null)}
-            >
-              <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                <title>Close</title>
-                <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.03a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
-              </svg>
-            </span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Info Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+            {/* Type Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Type*
+              </label>
+              <select
+                name="type"
+                value={formData.type}
+                onChange={handleInputChange}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                required
+              >
+                <option value="raw_material">Raw Material</option>
+                <option value="packaging">Packaging</option>
+                <option value="gear">Gear/Equipment</option>
+                <option value="books">Books</option>
+              </select>
+            </div>
+
             {/* Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -297,52 +305,28 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFo
                 type="date"
                 name="date"
                 value={formData.date}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 required
               />
             </div>
 
-            {/* Item Type */}
+            {/* Product Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Item Type*
+                Product*
               </label>
               <select
-                name="type"
-                value={formData.type}
-                onChange={handleTypeChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                name="product_name"
+                value={formData.product_name}
+                onChange={handleInputChange}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 required
               >
-                <option value="raw_material">Raw Material</option>
-                <option value="final_product">Final Product</option>
-                <option value="tea">Tea</option>
-                <option value="coffee">Coffee</option>
-              </select>
-            </div>
-
-            {/* Product */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                {formData.type === 'raw_material' ? 'Raw Material*' : 'Product*'}
-              </label>
-              <select
-                name="product"
-                value={selectedItemId}
-                onChange={handleProductChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                required
-              >
-                <option value="">Select {formData.type === 'raw_material' ? 'Raw Material' : 'Product'}</option>
-                {formData.type === 'raw_material' && rawMaterials.map(material => (
-                  <option key={material.id} value={material.id}>
-                    {material.name}
-                  </option>
-                ))}
-                {(formData.type === 'final_product' || formData.type === 'tea' || formData.type === 'coffee') && finalProducts.map(product => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
+                <option value="">Select a product</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.name}>
+                    {product.name} ({product.unit})
                   </option>
                 ))}
               </select>
@@ -355,14 +339,14 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFo
               </label>
               <select
                 name="supplier"
-                value={selectedSupplierId}
-                onChange={handleSupplierChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                value={formData.supplier}
+                onChange={handleInputChange}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 required
               >
-                <option value="">Select Supplier</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>
+                <option value="">Select a supplier</option>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.name}>
                     {supplier.name}
                   </option>
                 ))}
@@ -378,8 +362,8 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFo
                 type="text"
                 name="invoice_number"
                 value={formData.invoice_number}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 required
               />
             </div>
@@ -387,78 +371,16 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFo
             {/* Batch Number */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Batch Number
+                Batch Number*
               </label>
-              <input
+              <input 
                 type="text"
                 name="batch_number"
                 value={formData.batch_number}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-              />
-            </div>
-          </div>
-
-          {/* Quantity and Price Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-            {/* Quantity */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Quantity*
-              </label>
-              <input
-                type="number"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-                min="0"
-                step="1"
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 required
               />
-            </div>
-
-            {/* Package Size (g) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Package Size (g)
-              </label>
-              <input
-                type="number"
-                name="package_size"
-                value={formData.package_size}
-                onChange={handleChange}
-                min="0"
-                step="1"
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-              />
-            </div>
-
-            {/* Price per Unit */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Price per Unit (£)*
-              </label>
-              <input
-                type="number"
-                name="price_per_unit"
-                value={formData.price_per_unit}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                required
-              />
-            </div>
-            
-            {/* Total Cost (calculated) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Total Cost (£)
-              </label>
-              <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 py-2 shadow-sm sm:text-sm text-gray-900 dark:text-gray-100">
-                £{(formData.total_cost || 0).toFixed(2)}
-              </div>
             </div>
 
             {/* Best Before Date */}
@@ -470,141 +392,161 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFo
                 type="date"
                 name="best_before_date"
                 value={formData.best_before_date}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               />
             </div>
 
-            {/* Total kg (for tea/coffee) */}
-            {(formData.type === 'tea' || formData.type === 'coffee') && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Total kg
-                </label>
-                <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 py-2 shadow-sm sm:text-sm text-gray-900 dark:text-gray-100">
-                  {(formData.total_kg || 0).toFixed(2)} kg
-                </div>
-              </div>
-            )}
+            {/* Quantity */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Quantity*
+              </label>
+              <input
+                type="number"
+                name="quantity"
+                value={formData.quantity}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="mt-1 block w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                required
+              />
+            </div>
 
-            {/* Price per kg (for tea/coffee) */}
-            {(formData.type === 'tea' || formData.type === 'coffee') && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Price per kg (£)
-                </label>
-                <div className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 py-2 shadow-sm sm:text-sm text-gray-900 dark:text-gray-100">
-                  £{(formData.price_per_kg || 0).toFixed(2)}
-                </div>
+            {/* Price Per Unit */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Price Per Unit (£)*
+              </label>
+              <input
+                type="number"
+                name="price_per_unit"
+                value={formData.price_per_unit}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="mt-1 block w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                required
+              />
+            </div>
+
+            {/* Total Cost (Calculated) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Total Cost (£)
+              </label>
+              <div className="mt-1 block w-full border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-md shadow-sm sm:text-sm dark:text-gray-300">
+                £{calculateTotalCost()}
               </div>
-            )}
+            </div>
+
+            {/* Package Size */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Package Size (g)
+              </label>
+              <input
+                type="number"
+                name="package_size"
+                value={formData.package_size}
+                onChange={handleInputChange}
+                min="0"
+                className="mt-1 block w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+
+            {/* Checked By */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Checked By*
+              </label>
+              <input
+                type="text"
+                name="checked_by"
+                value={formData.checked_by}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                required
+              />
+            </div>
           </div>
 
-          {/* Quality & Acceptance Section */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="space-y-4">
-              {/* Checked By */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Checked By*
-                </label>
+          {/* Checkboxes */}
+          <div className="space-y-4">
+            <div className="flex items-start">
+              <div className="flex items-center h-5">
                 <input
-                  type="text"
-                  name="checked_by"
-                  value={formData.checked_by}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  required
+                  id="is_damaged"
+                  name="is_damaged"
+                  type="checkbox"
+                  checked={formData.is_damaged}
+                  onChange={handleInputChange}
+                  className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-700 rounded"
                 />
               </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="is_damaged" className="font-medium text-gray-700 dark:text-gray-300">
+                  Damaged on Arrival
+                </label>
+                <p className="text-gray-500 dark:text-gray-400">Mark if the product arrived damaged</p>
+              </div>
+            </div>
 
-              {/* Checkboxes */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Is Damaged */}
-                <div className="flex items-start">
-                  <div className="flex h-5 items-center">
-                    <input
-                      id="is_damaged"
-                      name="is_damaged"
-                      type="checkbox"
-                      checked={formData.is_damaged}
-                      onChange={handleChange}
-                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div className="ml-3 text-sm">
-                    <label htmlFor="is_damaged" className="font-medium text-gray-700 dark:text-gray-300">
-                      Damaged
-                    </label>
-                    <p className="text-gray-500 dark:text-gray-400">
-                      Check if the shipment arrived damaged
-                    </p>
-                  </div>
-                </div>
+            <div className="flex items-start">
+              <div className="flex items-center h-5">
+                <input
+                  id="labelling_matches_specifications"
+                  name="labelling_matches_specifications"
+                  type="checkbox"
+                  checked={formData.labelling_matches_specifications}
+                  onChange={handleInputChange}
+                  className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-700 rounded"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="labelling_matches_specifications" className="font-medium text-gray-700 dark:text-gray-300">
+                  Labelling Matches Specifications
+                </label>
+                <p className="text-gray-500 dark:text-gray-400">Confirm that labelling complies with requirements</p>
+              </div>
+            </div>
 
-                {/* Labelling Matches Specifications */}
-                <div className="flex items-start">
-                  <div className="flex h-5 items-center">
-                    <input
-                      id="labelling_matches_specifications"
-                      name="labelling_matches_specifications"
-                      type="checkbox"
-                      checked={formData.labelling_matches_specifications}
-                      onChange={handleChange}
-                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div className="ml-3 text-sm">
-                    <label htmlFor="labelling_matches_specifications" className="font-medium text-gray-700 dark:text-gray-300">
-                      Labelling Matches Specifications
-                    </label>
-                    <p className="text-gray-500 dark:text-gray-400">
-                      Check if the product labelling is correct
-                    </p>
-                  </div>
-                </div>
-
-                {/* Is Accepted */}
-                <div className="flex items-start">
-                  <div className="flex h-5 items-center">
-                    <input
-                      id="is_accepted"
-                      name="is_accepted"
-                      type="checkbox"
-                      checked={formData.is_accepted}
-                      onChange={handleChange}
-                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div className="ml-3 text-sm">
-                    <label htmlFor="is_accepted" className="font-medium text-gray-700 dark:text-gray-300">
-                      Accept Stock
-                    </label>
-                    <p className="text-gray-500 dark:text-gray-400">
-                      Check to add this stock to inventory
-                    </p>
-                  </div>
-                </div>
+            <div className="flex items-start">
+              <div className="flex items-center h-5">
+                <input
+                  id="is_accepted"
+                  name="is_accepted"
+                  type="checkbox"
+                  checked={formData.is_accepted}
+                  onChange={handleInputChange}
+                  className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-700 rounded"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="is_accepted" className="font-medium text-gray-700 dark:text-gray-300">
+                  Accept Stock
+                </label>
+                <p className="text-gray-500 dark:text-gray-400">Check to add this stock to your inventory</p>
               </div>
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex justify-end gap-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          {/* Submit and Cancel Buttons */}
+          <div className="flex justify-end space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md bg-white dark:bg-gray-700 px-3.5 py-2.5 text-sm font-semibold text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
-              disabled={loading}
+              className="py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:bg-indigo-400"
               disabled={loading}
+              className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400"
             >
-              {loading ? 'Saving...' : (editItem ? 'Update Stock' : 'Add Stock')}
+              {loading ? 'Saving...' : editItem ? 'Update Stock' : 'Add Stock'}
             </button>
           </div>
         </form>
@@ -612,5 +554,3 @@ export function ReceiveTeaCoffeeForm({ onClose, onSuccess, editItem }: ReceiveFo
     </div>
   )
 }
-
-              
